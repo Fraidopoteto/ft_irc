@@ -1,0 +1,35 @@
+---
+BasedOnStyle: Google
+
+Language: Cpp
+Standard: c++03
+
+UseTab: Never
+IndentWidth: 4
+TabWidth: 4
+
+ColumnLimit: 100
+
+PointerAlignment: Right
+
+BreakBeforeBraces: Custom
+BraceWrapping:
+  AfterFunction: true
+  AfterControlStatement: Never
+  AfterEnum: false
+  AfterStruct: false
+  AfterUnion: false
+  AfterExternBlock: false
+  BeforeCatch: false
+  BeforeElse: false
+  IndentBraces: false
+  SplitEmptyFunction: true
+  SplitEmptyRecord: true
+
+AllowShortIfStatementsOnASingleLine: Never
+AllowShortLoopsOnASingleLine: false
+AllowShortFunctionsOnASingleLine: Empty
+
+SortIncludes: true
+NamespaceIndentation: None
+---
