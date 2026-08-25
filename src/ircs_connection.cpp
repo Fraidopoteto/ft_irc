@@ -1,0 +1,197 @@
+#include "ircs_connection.h"
+
+#include <arpa/inet.h>
+#include <fcntl.h>
+#include <netdb.h>
+#include <stdlib.h>
+#include <sys/epoll.h>
+#include <sys/socket.h>
+#include <sys/types.h>
+#include <unistd.h>
+
+#include <cerrno>
+#include <cstring>
+
+#include "ircs_connection.h"
+#include "ircs_epoll.h"
+#include "ircs_logger.h"
+#include "ircserv.h"
+
+namespace ircs {
+using log::Logger;
+
+namespace {
+
+int GetInAddress(struct sockaddr *sa, char *in_addr, size_t maxlen)
+{
+    void *addr;
+
+    if (sa->sa_family == AF_INET) {
+        addr = &((reinterpret_cast<struct sockaddr_in *>(sa))->sin_addr);
+    } else if (sa->sa_family == AF_INET6) {
+        addr = &((reinterpret_cast<struct sockaddr_in6 *>(sa))->sin6_addr);
+    } else {
+        Logger(log::kError, "GetInAddress", "unknown address family");
+        return -1;
+    }
+
+    if (inet_ntop(sa->sa_family, addr, in_addr, maxlen) == NULL) {
+        Logger(log::kError, "GetInAddress", "inet_ntop: %s", strerror(errno));
+        return -1;
+    }
+
+    return 0;
+}
+
+void OnClientReadStub(EventLoop *event_loop, int fd, void *data, int mask)
+{
+    (void)event_loop;
+    (void)fd;
+    (void)data;
+    (void)mask;
+    return;
+}
+
+}  // namespace
+
+int CreateListener(char *port)
+{
+    int listenfd;
+    int yes = 1;  // For setsockopt() SO_REUSEADDR, below
+    int rv;
+
+    struct addrinfo hints, *ai, *p;
+
+    // Get us a socket and bind it
+    std::memset(&hints, 0, sizeof hints);
+    hints.ai_family = AF_INET;
+    hints.ai_socktype = SOCK_STREAM;
+    hints.ai_flags = AI_PASSIVE;
+    if ((rv = getaddrinfo(NULL, port, &hints, &ai)) != 0) {
+        Logger(log::kError, "getaddrinfo", gai_strerror(rv));
+        return -1;
+    }
+
+    for (p = ai; p != NULL; p = p->ai_next) {
+        listenfd = socket(p->ai_family, p->ai_socktype | SOCK_NONBLOCK, p->ai_protocol);
+        if (listenfd < 0) {
+            continue;
+        }
+
+        // Lose the pesky "address already in use" error message
+        setsockopt(listenfd, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(int));
+
+        if (bind(listenfd, p->ai_addr, p->ai_addrlen) < 0) {
+            close(listenfd);
+            continue;
+        }
+
+        break;
+    }
+
+    // If we got here, it means we didn't get bound
+    if (p == NULL) {
+        freeaddrinfo(ai);
+        return -1;
+    }
+
+    freeaddrinfo(ai);  // All done with this
+
+    // Listen
+    if (listen(listenfd, kDefaultBacklog) == -1) {
+        Logger(log::kError, "listen", strerror(errno));
+        return -1;
+    }
+
+    Logger(log::kInfo, "", "listening on port %s...", port);
+    return listenfd;
+}
+
+int CreateFileEvent(EventLoop *event_loop, int fd, int mask, FileProc proc, void *data)
+{
+    FileEvent *fe = &event_loop->events[fd];
+
+    if (EpollAddEvent(event_loop, fd, mask) == -1) {
+        return -1;
+    }
+
+    fe->mask |= mask;
+    if (mask & kOnReadable) {
+        fe->OnRead = proc;
+    }
+    if (mask & kOnWritable) {
+        fe->OnWrite = proc;
+    }
+    fe->data = data;
+    return 0;
+}
+
+void OnConnectionAccept(EventLoop *event_loop, int fd, void *data, int mask)
+{
+    (void)mask;  // not sure what to do with mask yet
+    (void)data;  // Listener does not need data
+    char ip[INET6_ADDRSTRLEN];
+    socklen_t socklen;
+    sockaddr_storage ss;
+    int client_fd;
+
+    socklen = sizeof(ss);
+    if ((client_fd = accept4(fd, (struct sockaddr *)&ss, &socklen, SOCK_NONBLOCK)) == -1) {
+        Logger(log::kError, "OnConnectionAccept", "accept: %s", strerror(errno));
+        return;
+    }
+
+    if (GetInAddress(reinterpret_cast<struct sockaddr *>(&ss), ip, sizeof(ip)) == -1) {
+        close(client_fd);
+        return;
+    }
+    Logger(log::kInfo, "", "got connection from %s", ip);
+
+    // Initialize Client data here
+    Client *c = new Client();
+    c->ip = ip;
+
+    if (CreateFileEvent(event_loop, client_fd, kOnReadable, OnClientReadStub, c) == -1) {
+        Logger(log::kError, "OnConnectionAccept", "failed to add connection");
+        close(client_fd);
+        delete c;
+        return;
+    }
+}
+
+int RunEventLoop(EventLoop *event_loop)
+{
+    int nfds;
+    struct epoll_event ee[kMaxEvents];
+
+    event_loop->stop = false;
+    while (!event_loop->stop) {
+        Logger(log::kDebug, "", "epoll wait");
+        if ((nfds = epoll_wait(event_loop->epfd, ee, kMaxEvents, -1)) == -1) {
+            Logger(log::kError, "epoll_wait", strerror(errno));
+            return -1;
+        }
+
+        for (int i = 0; i < nfds; i++) {
+            int fd = ee[i].data.fd;
+            uint32_t ev = ee[i].events;
+            FileEvent *fe = &event_loop->events[fd];
+
+            if (ev & (EPOLLERR | EPOLLHUP | EPOLLRDHUP)) {
+                // TODO: handle close
+                continue;
+            }
+
+            if (ev & EPOLLIN && fe->mask & kOnReadable) {
+                fe->OnRead(event_loop, fd, fe->data, fe->mask);
+            }
+
+            if (ev & EPOLLOUT && fe->mask & kOnWritable) {
+                fe->OnWrite(event_loop, fd, fe->data, fe->mask);
+            }
+        }
+    }
+    return 0;
+}
+
+}  // namespace ircs
