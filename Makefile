@@ -37,7 +37,8 @@ endif
 SRC :=	ircserv.cpp \
 		ircs_connection.cpp \
 		ircs_epoll.cpp \
-		ircs_logger.cpp
+		ircs_logger.cpp \
+		ircs_message.cpp
 
 OBJ	:= $(SRC:.cpp=.o)
 OBJ	:= $(addprefix $(OBJDIR)/, $(OBJ))
@@ -107,4 +108,3 @@ $(TEST_NAME): $(CATCH_OBJ) $(TEST_APP_OBJ) $(TEST_OBJ)
 
 .PHONY: all clean fclean re test
 test: $(TEST_NAME)
-	./$(TEST_NAME)

@@ -11,7 +11,6 @@
 
 #include <cstring>
 #include <iostream>
-#include <vector>
 
 #include "ircs_connection.h"
 #include "ircs_logger.h"
@@ -25,6 +24,9 @@ int main(int argc, char **argv)
         return 1;
     }
 
+    int epfd;
+    int listenfd;
+
     // struct rlimit rl;
     // if (getrlimit(RLIMIT_NOFILE, &rl) == -1) {
     //     ircs::log::Logger(ircs::log::kError, "getrlimit()", strerror(errno));
@@ -36,14 +38,13 @@ int main(int argc, char **argv)
         std::cerr << "error: Port cannot be empty" << std::endl;
         return 1;
     }
-    // TODO:(rtwobie): Check if password can be empty
-    // if (argv[2] == NULL || argv[2][0] == '\0') {
-    //     std::cerr << "error: Password cannot be empty" << std::endl;
-    //     return 1;
-    // }
 
-    int listenfd;
-    int epfd;
+    char *endptr;
+    long port = strtol(argv[1], &endptr, 10);
+    if (*endptr != '\0' || port < 1 || port > 65535) {
+        std::cerr << "error: invalid Port" << std::endl;
+        return -1;
+    }
 
     if ((epfd = epoll_create1(0)) == -1) {
         Logger(ircs::log::kError, "epoll_create", strerror(errno));
@@ -58,6 +59,8 @@ int main(int argc, char **argv)
     std::memset(&el, 0, sizeof(el));
     el.epfd = epfd;
     el.stop = false;
+    el.context.port = static_cast<int>(port);
+    el.context.password = (argv[2] == NULL || argv[2][0] == '\0') ? NULL : argv[2];
 
     if (CreateFileEvent(&el, listenfd, ircs::kOnReadable, ircs::OnConnectionAccept, NULL) == -1) {
         return 1;
