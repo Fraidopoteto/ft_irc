@@ -58,7 +58,7 @@ clean:
 	rm -rf $(OBJDIR)
 
 fclean: clean
-	rm -f $(NAME)
+	rm -f $(NAME) $(TEST_NAME)
 
 re:
 	@$(MAKE) fclean
@@ -72,42 +72,36 @@ TEST_NAME	:= test_runner
 TEST_DIR	:= tests
 TEST_OBJDIR	:= $(OBJDIR)/tests
 
-# Swap C++98 for C++14 for testing compilation
-TEST_CXXFLAGS := $(filter-out -std=c++98, $(CXXFLAGS)) -std=c++14
+TEST_CXXFLAGS	:= $(CXXFLAGS)
+TEST_INCS		:= $(INCS) -isystem $(TEST_DIR)/
 
-# 1. Production objects compiled in C++14 (Excluded core/webserv.cpp for main)
-TEST_APP_SRC := $(filter-out core/webserv.cpp, $(SRC))
+# Exclude main() in production code
+TEST_APP_SRC := $(filter-out ircserv.cpp, $(SRC))
 TEST_APP_OBJ := $(TEST_APP_SRC:.cpp=.o)
 TEST_APP_OBJ := $(addprefix $(TEST_OBJDIR)/, $(TEST_APP_OBJ))
 
-# 2. Test objects (Add new test files here)
-# TEST_SRC := test_webs_connection.cpp
+# Add Test Files Here!
+# example: TEST_SRC := test_file.cpp
+# ===========================================
+
+TEST_SRC := test_main.cpp \
+			test_ircs_message.cpp
+
+# ===========================================
 TEST_OBJ := $(TEST_SRC:.cpp=.o)
 TEST_OBJ := $(addprefix $(TEST_OBJDIR)/, $(TEST_OBJ))
 
-# The heavy Catch2 framework object
-CATCH_OBJ := $(TEST_OBJDIR)/catch_amalgamated.o
-
-# Include dependencies for test files
 TEST_DEP := $(TEST_APP_OBJ:.o=.d) $(TEST_OBJ:.o=.d)
 -include $(TEST_DEP)
 
-# 3. Compile Catch2 framework separately
-$(CATCH_OBJ): $(TEST_DIR)/catch_amalgamated.cpp
-	@mkdir -p $(dir $@)
-	$(CXX) $(TEST_CXXFLAGS) $(INCS) -c $< -o $@
-
-# 4. Compile the test files
 $(TEST_OBJDIR)/%.o: $(TEST_DIR)/%.cpp
 	@mkdir -p $(dir $@)
 	$(CXX) $(TEST_CXXFLAGS) $(INCS) -c $< -o $@
 
-# 5. Compile the C++14 versions of the production code
 $(TEST_OBJDIR)/%.o: $(SRCDIR)/%.cpp
 	@mkdir -p $(dir $@)
 	$(CXX) $(TEST_CXXFLAGS) $(INCS) -c $< -o $@
 
-# 6. Link the test binary
 $(TEST_NAME): $(CATCH_OBJ) $(TEST_APP_OBJ) $(TEST_OBJ)
 	$(CXX) $^ $(LDFLAGS) $(LDLIBS) -o $@
 
