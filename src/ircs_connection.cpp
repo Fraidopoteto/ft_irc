@@ -189,6 +189,24 @@ void OnConnectionAccept(EventLoop *event_loop, int fd, void *data, int mask)
     }
 }
 
+Client *NewClient(int fd, char *ip)
+{
+    Client *c = new Client();
+
+    c->fd = fd;
+    c->ip = ip;
+    c->msg_buf.reserve(kMsgBufSize);
+    c->write_buf.reserve(kMsgBufSize);
+
+    c->state = CONNECTED;
+
+    c->pass_accepted = false;
+    c->nick_accepted = false;
+    c->name_accepted = false;
+
+    return c;
+}
+
 int RunEventLoop(EventLoop *event_loop)
 {
     int nfds;
