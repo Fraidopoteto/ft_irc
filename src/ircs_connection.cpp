@@ -9,8 +9,10 @@
 #include <sys/types.h>
 #include <unistd.h>
 
+#include <cctype>
 #include <cerrno>
 #include <cstring>
+#include <string>
 
 #include "ircs_connection.h"
 #include "ircs_epoll.h"
@@ -205,6 +207,74 @@ Client *NewClient(int fd, char *ip)
     c->name_accepted = false;
 
     return c;
+}
+
+bool ValidateClient(int client_fd, msg::Message msg)
+{
+    // if (msg.command == "PASS") {
+    //     ValidatePassword(msg.parameters)
+    // }
+}
+
+bool ValidateNickname(const std::string &nick_name, int client_fd)
+{
+    char first = nick_name[0];
+
+    if (first == '$' || first == ':' || first == '#' || first == '&' || first == '@' ||
+        first == '+') {
+        return false;  // add log message and usermessage: bad nickname
+    }
+
+    if (nick_name.is_empty() || nick_name.length() > 30 || nick_name.length() < 2)
+        return false;  // add log message and usermessage: bad nickname
+
+    for (size_t i = 0; i < nick_name.lenght(); ++i) {
+        char c = nick_name[i];
+        if (c == ' ' || c == ',' || c == '*' || c == '?' || c == '!' || c == '@') {
+            return false;  // add log message and usermessage: bad nickname
+        }
+    }
+
+    for (auto it = clients.begin(); it != clients.end(); ++it) {
+        if (it->second->fd != client_fd) {
+            if (it->second->nick_name == nick_name) {
+                return false;  // add log message and usermessage: duplicate names
+            }
+        }
+    }
+
+    return true;
+}
+
+bool ValidateUsername(const std::string &user_name)
+{
+    if (user_name[0] == '~') {
+        return false;  // add log and usermessage: bad username
+    }
+
+    if (user_name.empty() || user_name.length() > 10) {
+        return false;  // add log and usermessage: bad username
+    }
+
+    for (size_t i = 0; i < nick_name.lenght(); ++i) {
+        char c = nick_name[i];
+        if (std::iscntrl(c) || c == ' ' || c == '@' || c == ':') {
+            return false;  // add log and usermessage: bad username
+        }
+    }
+
+    return true;
+}
+
+bool ValidatePassword(const std::string password)
+{
+    if (!EventLoopContext.password)
+        return true;
+
+    if (EventLoopContext.password != password)
+        return false;  // add log message and usermessage: bad password
+
+    return true;
 }
 
 int RunEventLoop(EventLoop *event_loop)
