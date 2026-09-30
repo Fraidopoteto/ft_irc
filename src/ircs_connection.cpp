@@ -21,6 +21,8 @@
 namespace ircs {
 using log::Logger;
 
+std::map<int, Client *> clients;
+
 namespace {
 
 int GetInAddress(struct sockaddr *sa, char *in_addr, size_t maxlen)
@@ -175,7 +177,9 @@ void OnConnectionAccept(EventLoop *event_loop, int fd, void *data, int mask)
     }
     Logger(log::kInfo, "", "got connection from %s", ip);
 
-    Client *c = NewClient(ip);
+    Client *c = NewClient(client_fd, ip);
+
+    clients[client_fd] = c;
 
     if (CreateFileEvent(event_loop, client_fd, kOnReadable, OnClientReadStub, c) == -1) {
         Logger(log::kError, "OnConnectionAccept", "failed to add connection");

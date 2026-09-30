@@ -5,7 +5,9 @@
 #include <stdint.h>
 #include <sys/socket.h>
 
+#include <map>
 #include <string>
+#include <vector>
 
 #include "ircs_message.h"
 #include "ircserv.h"
@@ -38,10 +40,26 @@ struct EventLoop {
     bool stop;
 };
 
+enum RegistrationState { CONNECTED, VALID, REGISTERED };
+
+class Channel;
+
 struct Client {
+    int fd;
     std::string ip;
-    std::string msgbuf;
-    msg::Message message;
+    std::string msg_buf;
+    std::string write_buf;
+
+    bool pass_accepted;
+    bool nick_accepted;
+    bool name_accepted;
+
+    std::string nick_name;
+    std::string user_name;
+    std::string real_name;
+    std::string host_name;
+
+    std::vector<Channel *> joined_channels;
     // char msgbuf[kMsgBufSize];
     // ssize_t bytes_received;
 };
