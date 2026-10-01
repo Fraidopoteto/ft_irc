@@ -5,7 +5,9 @@
 #include <stdint.h>
 #include <sys/socket.h>
 
+#include <map>
 #include <string>
+#include <vector>
 
 #include "ircs_message.h"
 #include "ircserv.h"
@@ -28,6 +30,7 @@ struct FileEvent {
 struct EventLoopContext {
     int port;
     char *password;
+    std::map<int, Client *> clients;
 };
 
 struct EventLoop {
@@ -38,18 +41,46 @@ struct EventLoop {
     bool stop;
 };
 
+enum RegistrationState { CONNECTED, REGISTERED };
+
+class Channel;
+
 struct Client {
+    int fd;
     std::string ip;
     std::string msgbuf;
-    msg::Message message;
+    std::string writebuf;
+
+    bool pass_accepted;
+    bool nick_accepted;
+    bool name_accepted;
+
+    std::string nick_name;
+    std::string user_name;
+    std::string real_name;
+    std::string host_name;
+
+    std::vector<Channel *> joined_channels;
     // char msgbuf[kMsgBufSize];
     // ssize_t bytes_received;
+
+    RegistrationState state;
 };
+
+// Client Registration
+
+bool is_ValidNickname(const std::string &nick_name, int client_fd, EventLoopContext &context);
+bool is_ValidUsername(const std::string &user_name);
+bool is_ValidPassword(const std::string &user_pass, const char *server_pass);
+bool is_ValidClient(int client_fd, msg::Message &msg, EventLoopContext &context);
+
+Client *NewClient(int fd, char *ip);
 
 int CreateListener(char *port);
 int CreateFileEvent(EventLoop *event_loop, int fd, int mask, FileProc proc, void *data);
 int RunEventLoop(EventLoop *event_loop);
-void OnConnectionAccept(EventLoop *event_loop, int fd, void *data, int mask);
+void OnConnectionAccept(EventLoop *event_loop, EventLoopContext &context, int fd, void *data,
+                        int mask);
 
 }  // namespace ircs
 

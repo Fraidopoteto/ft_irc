@@ -23,7 +23,8 @@ int IsCommand(const std::string &cmd)
     return 0;
 }
 
-std::string ConsumeToken(const std::string &message, size_t &pos) {
+std::string ConsumeToken(const std::string &message, size_t &pos)
+{
     if (pos == std::string::npos || pos >= message.length()) {
         return "";
     }
@@ -67,6 +68,7 @@ int ParseMessage(const std::string &message, Message &msg)
         }
         msg.trailing = message.substr(pos);
     }
+
     return 0;
 }
 
@@ -76,11 +78,12 @@ int ProcessMessage(EventLoopContext &context, Message &msg)
     // parse prefix
     // ...
 
-    //parse command
+    // parse command
     if (msg.command.length() == 3 && std::isdigit(msg.command[0]) && std::isdigit(msg.command[1]) &&
         std::isdigit(msg.command[2])) {
         // numeric =
-        //     (message[pos] - '0') * 100 + (message[pos + 1] - '0') * 10 + (message[pos + 2] - '0');
+        //     (message[pos] - '0') * 100 + (message[pos + 1] - '0') * 10 + (message[pos + 2] -
+        //     '0');
         // parse digit command
     } else {
         if (!IsCommand(msg.command)) {

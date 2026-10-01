@@ -9,8 +9,11 @@
 #include <sys/types.h>
 #include <unistd.h>
 
+#include <cctype>
 #include <cerrno>
+#include <cstddef>
 #include <cstring>
+#include <string>
 
 #include "ircs_connection.h"
 #include "ircs_epoll.h"
@@ -143,18 +146,8 @@ int CreateFileEvent(EventLoop *event_loop, int fd, int mask, FileProc proc, void
     return 0;
 }
 
-Client *NewClient(char *ip)
-{
-    // Initialize Client data
-    Client *c = new Client();
-    c->ip = ip;
-    c->msgbuf.reserve(msg::kMsgBufSize);
-    // c->bytes_received = 0;
-
-    return c;
-}
-
-void OnConnectionAccept(EventLoop *event_loop, int fd, void *data, int mask)
+void OnConnectionAccept(EventLoop *event_loop, EventLoopContext &context, int fd, void *data,
+                        int mask)
 {
     (void)mask;  // not sure what to do with mask yet
     (void)data;  // Listener does not need data
@@ -175,7 +168,9 @@ void OnConnectionAccept(EventLoop *event_loop, int fd, void *data, int mask)
     }
     Logger(log::kInfo, "", "got connection from %s", ip);
 
-    Client *c = NewClient(ip);
+    Client *c = NewClient(client_fd, ip);
+
+    context.clients[client_fd] = c;
 
     if (CreateFileEvent(event_loop, client_fd, kOnReadable, OnClientReadStub, c) == -1) {
         Logger(log::kError, "OnConnectionAccept", "failed to add connection");
@@ -183,6 +178,122 @@ void OnConnectionAccept(EventLoop *event_loop, int fd, void *data, int mask)
         delete c;
         return;
     }
+}
+
+Client *NewClient(int fd, char *ip)
+{
+    Client *c = new Client();
+
+    c->fd = fd;
+    c->ip = ip;
+    c->msgbuf.reserve(msg::kMsgBufSize);
+    c->writebuf.reserve(msg::kMsgBufSize);
+
+    c->state = CONNECTED;
+
+    c->pass_accepted = false;
+    c->nick_accepted = false;
+    c->name_accepted = false;
+
+    return c;
+}
+
+bool is_ValidNickname(const std::string &nick_name, int client_fd, EventLoopContext &context)
+{
+    char first = nick_name[0];
+
+    if (first == '$' || first == ':' || first == '#' || first == '&' || first == '@' ||
+        first == '+') {
+        return false;  // add log message and usermessage: bad nickname
+    }
+
+    if (nick_name.empty() || nick_name.length() > 30 || nick_name.length() < 2)
+        return false;  // add log message and usermessage: bad nickname
+
+    for (size_t i = 0; i < nick_name.length(); ++i) {
+        char c = nick_name[i];
+        if (c == ' ' || c == ',' || c == '*' || c == '?' || c == '!' || c == '@') {
+            return false;  // add log message and usermessage: bad nickname
+        }
+    }
+
+    for (std::map<int, Client *>::iterator it = context.clients.begin();
+         it != context.clients.end(); ++it) {
+        if (it->second->fd != client_fd) {
+            if (it->second->nick_name == nick_name) {
+                return false;  // add log message and usermessage: duplicate names
+            }
+        }
+    }
+
+    return true;
+}
+
+bool is_ValidUsername(const std::string &user_name)
+{
+    if (user_name[0] == '~') {
+        return false;  // add log and usermessage: bad username
+    }
+
+    if (user_name.empty() || user_name.length() > 10) {
+        return false;  // add log and usermessage: bad username
+    }
+
+    for (size_t i = 0; i < user_name.length(); ++i) {
+        char c = user_name[i];
+        if (std::iscntrl(c) || c == ' ' || c == '@' || c == ':') {
+            return false;  // add log and usermessage: bad username
+        }
+    }
+
+    return true;
+}
+
+bool is_ValidPassword(const std::string &user_pass, const char *server_pass)
+{
+    if (!server_pass)
+        return true;
+
+    if (server_pass != user_pass)
+        return false;  // add log message and usermessage: bad password
+
+    return true;
+}
+
+bool is_ValidClient(int client_fd, msg::Message &msg, EventLoopContext &context)
+{
+    if (msg.command == "PASS") {
+        if (is_ValidPassword(msg.parameters[0], context.password)) {
+            context.clients[client_fd]->pass_accepted = true;
+        } else {
+            return false;
+        }
+    }
+
+    if (msg.command == "NICK") {
+        if (is_ValidNickname(msg.parameters[0], client_fd, context)) {
+            context.clients[client_fd]->nick_accepted = true;
+            context.clients[client_fd]->nick_name = msg.parameters[0];
+        } else {
+            return false;
+        }
+    }
+
+    if (msg.command == "USER") {
+        if (is_ValidUsername(msg.parameters[0])) {
+            context.clients[client_fd]->name_accepted = true;
+            context.clients[client_fd]->user_name = msg.parameters[0];
+        }
+    }
+
+    if (context.clients[client_fd]->state == CONNECTED &&
+        context.clients[client_fd]->pass_accepted && context.clients[client_fd]->nick_accepted &&
+        context.clients[client_fd]->name_accepted) {
+        context.clients[client_fd]->state = REGISTERED;
+        return true;
+    }
+
+    return false;
 }
 
 int RunEventLoop(EventLoop *event_loop)
