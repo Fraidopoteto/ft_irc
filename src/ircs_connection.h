@@ -66,6 +66,15 @@ struct Client {
     RegistrationState state;
 };
 
+// Client Registration
+
+bool ValidateNickname(const std::string &nick_name, int client_fd);
+bool ValidateUsername(const std::string &user_name);
+bool ValidatePassword(const std::string password);
+bool ValidateClient(int client_fd, msg::Message &msg);
+
+Client *NewClient(int fd, char *ip);
+
 int CreateListener(char *port);
 int CreateFileEvent(EventLoop *event_loop, int fd, int mask, FileProc proc, void *data);
 int RunEventLoop(EventLoop *event_loop);

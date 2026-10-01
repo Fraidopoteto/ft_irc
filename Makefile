@@ -86,7 +86,8 @@ TEST_APP_OBJ := $(addprefix $(TEST_OBJDIR)/, $(TEST_APP_OBJ))
 # ===========================================
 
 TEST_SRC := test_main.cpp \
-			test_ircs_message.cpp
+			test_ircs_message.cpp \
+			test_ircs_client_registration.cpp
 
 # ===========================================
 TEST_OBJ := $(TEST_SRC:.cpp=.o)

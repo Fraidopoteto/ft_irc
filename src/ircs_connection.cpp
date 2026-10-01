@@ -11,6 +11,7 @@
 
 #include <cctype>
 #include <cerrno>
+#include <cstddef>
 #include <cstring>
 #include <string>
 
@@ -197,8 +198,8 @@ Client *NewClient(int fd, char *ip)
 
     c->fd = fd;
     c->ip = ip;
-    c->msg_buf.reserve(kMsgBufSize);
-    c->write_buf.reserve(kMsgBufSize);
+    c->msg_buf.reserve(msg::kMsgBufSize);
+    c->write_buf.reserve(msg::kMsgBufSize);
 
     c->state = CONNECTED;
 
@@ -218,17 +219,17 @@ bool ValidateNickname(const std::string &nick_name, int client_fd)
         return false;  // add log message and usermessage: bad nickname
     }
 
-    if (nick_name.is_empty() || nick_name.length() > 30 || nick_name.length() < 2)
+    if (nick_name.empty() || nick_name.length() > 30 || nick_name.length() < 2)
         return false;  // add log message and usermessage: bad nickname
 
-    for (size_t i = 0; i < nick_name.lenght(); ++i) {
+    for (size_t i = 0; i < nick_name.length(); ++i) {
         char c = nick_name[i];
         if (c == ' ' || c == ',' || c == '*' || c == '?' || c == '!' || c == '@') {
             return false;  // add log message and usermessage: bad nickname
         }
     }
 
-    for (auto it = clients.begin(); it != clients.end(); ++it) {
+    for (std::map<int, Client *>::iterator it = clients.begin(); it != clients.end(); ++it) {
         if (it->second->fd != client_fd) {
             if (it->second->nick_name == nick_name) {
                 return false;  // add log message and usermessage: duplicate names
@@ -249,7 +250,7 @@ bool ValidateUsername(const std::string &user_name)
         return false;  // add log and usermessage: bad username
     }
 
-    for (size_t i = 0; i < user_name.lenght(); ++i) {
+    for (size_t i = 0; i < user_name.length(); ++i) {
         char c = user_name[i];
         if (std::iscntrl(c) || c == ' ' || c == '@' || c == ':') {
             return false;  // add log and usermessage: bad username
@@ -261,10 +262,10 @@ bool ValidateUsername(const std::string &user_name)
 
 bool ValidatePassword(const std::string password)
 {
-    if (!EventLoopContext.password)
+    if (!ircs::EventLoopContext.password)
         return true;
 
-    if (EventLoopContext.password != password)
+    if (ircs::EventLoopContext.password != password)
         return false;  // add log message and usermessage: bad password
 
     return true;
