@@ -15,6 +15,7 @@
 #include "ircs_connection.h"
 #include "ircs_epoll.h"
 #include "ircs_logger.h"
+#include "ircs_message.h"
 #include "ircserv.h"
 
 namespace ircs {
@@ -45,6 +46,22 @@ int GetInAddress(struct sockaddr *sa, char *in_addr, size_t maxlen)
 
 void OnClientReadStub(EventLoop *event_loop, int fd, void *data, int mask)
 {
+    Client *client = static_cast<Client *>(data);
+    ssize_t bytes_received;
+    char buf[kReadChunkSize];
+
+    bytes_received = recv(fd, buf, sizeof(buf), 0);
+    if (bytes_received == -1) {
+        return;
+    }
+
+    if (bytes_received == 0) {
+        // close the connection;
+    }
+
+    if (bytes_received > 0) {
+        msg::ProcessTcpStream(event_loop->context, buf, client, bytes_received);
+    }
     (void)event_loop;
     (void)fd;
     (void)data;
@@ -126,6 +143,17 @@ int CreateFileEvent(EventLoop *event_loop, int fd, int mask, FileProc proc, void
     return 0;
 }
 
+Client *NewClient(char *ip)
+{
+    // Initialize Client data
+    Client *c = new Client();
+    c->ip = ip;
+    c->msgbuf.reserve(msg::kMsgBufSize);
+    // c->bytes_received = 0;
+
+    return c;
+}
+
 void OnConnectionAccept(EventLoop *event_loop, int fd, void *data, int mask)
 {
     (void)mask;  // not sure what to do with mask yet
@@ -147,9 +175,7 @@ void OnConnectionAccept(EventLoop *event_loop, int fd, void *data, int mask)
     }
     Logger(log::kInfo, "", "got connection from %s", ip);
 
-    // Initialize Client data here
-    Client *c = new Client();
-    c->ip = ip;
+    Client *c = NewClient(ip);
 
     if (CreateFileEvent(event_loop, client_fd, kOnReadable, OnClientReadStub, c) == -1) {
         Logger(log::kError, "OnConnectionAccept", "failed to add connection");

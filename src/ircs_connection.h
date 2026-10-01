@@ -7,6 +7,7 @@
 
 #include <string>
 
+#include "ircs_message.h"
 #include "ircserv.h"
 
 namespace ircs {
@@ -24,15 +25,25 @@ struct FileEvent {
     void *data;
 };
 
+struct EventLoopContext {
+    int port;
+    char *password;
+};
+
 struct EventLoop {
     int epfd;
     int maxfds;                             // amount of file descriptors currently registered
     FileEvent events[kMaxConnections + 1];  // +1 to say the server is full to the last connection
+    EventLoopContext context;
     bool stop;
 };
 
 struct Client {
     std::string ip;
+    std::string msgbuf;
+    msg::Message message;
+    // char msgbuf[kMsgBufSize];
+    // ssize_t bytes_received;
 };
 
 int CreateListener(char *port);
