@@ -24,8 +24,6 @@
 namespace ircs {
 using log::Logger;
 
-std::map<int, Client *> clients;
-
 namespace {
 
 int GetInAddress(struct sockaddr *sa, char *in_addr, size_t maxlen)
@@ -148,7 +146,8 @@ int CreateFileEvent(EventLoop *event_loop, int fd, int mask, FileProc proc, void
     return 0;
 }
 
-void OnConnectionAccept(EventLoop *event_loop, int fd, void *data, int mask)
+void OnConnectionAccept(EventLoop *event_loop, EventLoopContext &context, int fd, void *data,
+                        int mask)
 {
     (void)mask;  // not sure what to do with mask yet
     (void)data;  // Listener does not need data
@@ -171,7 +170,7 @@ void OnConnectionAccept(EventLoop *event_loop, int fd, void *data, int mask)
 
     Client *c = NewClient(client_fd, ip);
 
-    clients[client_fd] = c;
+    context.clients[client_fd] = c;
 
     if (CreateFileEvent(event_loop, client_fd, kOnReadable, OnClientReadStub, c) == -1) {
         Logger(log::kError, "OnConnectionAccept", "failed to add connection");
@@ -199,7 +198,7 @@ Client *NewClient(int fd, char *ip)
     return c;
 }
 
-bool ValidateNickname(const std::string &nick_name, int client_fd)
+bool is_ValidNickname(const std::string &nick_name, int client_fd, EventLoopContext &context)
 {
     char first = nick_name[0];
 
@@ -218,7 +217,8 @@ bool ValidateNickname(const std::string &nick_name, int client_fd)
         }
     }
 
-    for (std::map<int, Client *>::iterator it = clients.begin(); it != clients.end(); ++it) {
+    for (std::map<int, Client *>::iterator it = context.clients.begin();
+         it != context.clients.end(); ++it) {
         if (it->second->fd != client_fd) {
             if (it->second->nick_name == nick_name) {
                 return false;  // add log message and usermessage: duplicate names
@@ -229,7 +229,7 @@ bool ValidateNickname(const std::string &nick_name, int client_fd)
     return true;
 }
 
-bool ValidateUsername(const std::string &user_name)
+bool is_ValidUsername(const std::string &user_name)
 {
     if (user_name[0] == '~') {
         return false;  // add log and usermessage: bad username
@@ -249,7 +249,7 @@ bool ValidateUsername(const std::string &user_name)
     return true;
 }
 
-bool ValidatePassword(const std::string &user_pass, const char *server_pass)
+bool is_ValidPassword(const std::string &user_pass, const char *server_pass)
 {
     if (!server_pass)
         return true;
@@ -260,38 +260,40 @@ bool ValidatePassword(const std::string &user_pass, const char *server_pass)
     return true;
 }
 
-bool ValidateClient(int client_fd, msg::Message &msg, const char *server_pass)
+bool is_ValidClient(int client_fd, msg::Message &msg, EventLoopContext &context)
 {
     if (msg.command == "PASS") {
-        if (ValidatePassword(msg.parameters[0], server_pass)) {
-            clients[client_fd]->pass_accepted = true;
+        if (is_ValidPassword(msg.parameters[0], context.password)) {
+            context.clients[client_fd]->pass_accepted = true;
         } else {
             return false;
         }
     }
 
     if (msg.command == "NICK") {
-        if (ValidateNickname(msg.parameters[0], client_fd)) {
-            clients[client_fd]->nick_accepted = true;
-            clients[client_fd]->nick_name = msg.parameters[0];
+        if (is_ValidNickname(msg.parameters[0], client_fd, context)) {
+            context.clients[client_fd]->nick_accepted = true;
+            context.clients[client_fd]->nick_name = msg.parameters[0];
         } else {
             return false;
         }
     }
 
     if (msg.command == "USER") {
-        if (ValidateUsername(msg.parameters[0])) {
-            clients[client_fd]->name_accepted = true;
-            clients[client_fd]->user_name = msg.parameters[0];
+        if (is_ValidUsername(msg.parameters[0])) {
+            context.clients[client_fd]->name_accepted = true;
+            context.clients[client_fd]->user_name = msg.parameters[0];
         }
     }
 
-    if (clients[client_fd]->state == CONNECTED && clients[client_fd]->pass_accepted &&
-        clients[client_fd]->nick_accepted && clients[client_fd]->name_accepted) {
-        clients[client_fd]->state = REGISTERED;
+    if (context.clients[client_fd]->state == CONNECTED &&
+        context.clients[client_fd]->pass_accepted && context.clients[client_fd]->nick_accepted &&
+        context.clients[client_fd]->name_accepted) {
+        context.clients[client_fd]->state = REGISTERED;
+        return true;
     }
 
-    return true;
+    return false;
 }
 
 int RunEventLoop(EventLoop *event_loop)

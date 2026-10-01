@@ -30,6 +30,7 @@ struct FileEvent {
 struct EventLoopContext {
     int port;
     char *password;
+    std::map<int, Client *> clients;
 };
 
 struct EventLoop {
@@ -68,17 +69,18 @@ struct Client {
 
 // Client Registration
 
-bool ValidateNickname(const std::string &nick_name, int client_fd);
-bool ValidateUsername(const std::string &user_name);
-bool ValidatePassword(const std::string &user_pass, const char *server_pass);
-bool ValidateClient(int client_fd, msg::Message &msg, const char *server_pass);
+bool is_ValidNickname(const std::string &nick_name, int client_fd, EventLoopContext &context);
+bool is_ValidUsername(const std::string &user_name);
+bool is_ValidPassword(const std::string &user_pass, const char *server_pass);
+bool is_ValidClient(int client_fd, msg::Message &msg, EventLoopContext &context);
 
 Client *NewClient(int fd, char *ip);
 
 int CreateListener(char *port);
 int CreateFileEvent(EventLoop *event_loop, int fd, int mask, FileProc proc, void *data);
 int RunEventLoop(EventLoop *event_loop);
-void OnConnectionAccept(EventLoop *event_loop, int fd, void *data, int mask);
+void OnConnectionAccept(EventLoop *event_loop, EventLoopContext &context, int fd, void *data,
+                        int mask);
 
 }  // namespace ircs
 
