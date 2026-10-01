@@ -60,6 +60,7 @@ struct Client {
     std::string real_name;
     std::string host_name;
 
+    msg::Message message;
     std::vector<Channel *> joined_channels;
     // char msgbuf[kMsgBufSize];
     // ssize_t bytes_received;

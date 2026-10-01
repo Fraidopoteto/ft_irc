@@ -8,20 +8,9 @@
 
 #include "ircs_connection.h"
 
-namespace ircs {
-namespace msg {
+namespace {
 
-const static std::string kCommandList[] = {kPass, kNick, kUser};
-
-int IsCommand(const std::string &cmd)
-{
-    for (int i = 0; i < 3; i++) {
-        if (cmd == kCommandList[i]) {
-            return 1;
-        }
-    }
-    return 0;
-}
+const static std::string kCommandList[] = {ircs::msg::kPass, ircs::msg::kNick, ircs::msg::kUser};
 
 std::string ConsumeToken(const std::string &message, size_t &pos)
 {
@@ -40,25 +29,119 @@ std::string ConsumeToken(const std::string &message, size_t &pos)
     return token;
 }
 
-int ParseMessage(const std::string &message, Message &msg)
+bool IsMessagePrefixValid(const std::string &prefix)
 {
+    char c;
+
+    if (!prefix.empty()) {
+        bool exclamation_seen = false;
+        bool at_seen = false;
+
+        for (size_t i = 0; i < prefix.length(); i++) {
+            c = prefix[i];
+
+            if (c == ' ' || c == '\r' || c == '\n' || c == '\0') {
+                return false;
+            }
+
+            if (c == '!') {
+                if (exclamation_seen || at_seen || i == 0) {
+                    return false;
+                }
+                exclamation_seen = true;
+            } else if (c == '@') {
+                if (at_seen || i == 0) {
+                    return false;
+                }
+                at_seen = true;
+            }
+        }
+    }
+    return true;
+}
+
+bool IsMessageCommandValid(const std::string &command)
+{
+    char c;
+    if (command.empty()) {
+        return false;
+    }
+    for (size_t i = 0; i < command.length(); i++) {
+        c = command[i];
+        if (!std::isalpha(c)) {
+            return false;
+        }
+    }
+    return true;
+}
+
+bool IsMessageParameterValid(const std::string &parameter)
+{
+    char c;
+    for (size_t i = 0; i < parameter.length(); i++) {
+        c = parameter[i];
+        if (c == '\0' || c == '\r' || c == '\n' || c == ' ' || c == ':') {
+            return false;
+        }
+    }
+    return true;
+}
+
+bool IsMessageTrailingValid(const std::string &trailing)
+{
+    char c;
+
+    for (size_t i = 0; i < trailing.length(); i++) {
+        c = trailing[i];
+        // Spaces are allowed here
+        if (c == '\0' || c == '\r' || c == '\n') {
+            return false;
+        }
+    }
+    return true;
+}
+
+}  // namespace
+
+namespace ircs {
+namespace msg {
+
+int ParseMessage(const std::string &message, ircs::msg::Message &msg)
+{
+    std::string token;
     size_t pos = 0;
 
     if (message[pos] == ':') {
         pos += 1;
-        msg.prefix = ConsumeToken(message, pos);
+        token = ConsumeToken(message, pos);
+        if (!IsMessagePrefixValid(token)) {
+            return -1;
+        }
+        msg.prefix = token;
     }
 
-    msg.command = ConsumeToken(message, pos);
+    token = ConsumeToken(message, pos);
+    if (!IsMessageCommandValid(token)) {
+        return -1;
+    }
+    msg.command = token;
 
     int i = 0;
-    while (pos != std::string::npos && pos < message.length() && i < kMaxParameters - 1) {
+    while (pos != std::string::npos && pos < message.length() && i < ircs::msg::kMaxParameters - 1) {
         if (message[pos] == ':') {
-            msg.trailing = message.substr(pos + 1);
+            token = message.substr(pos + 1);
+            if (!IsMessageTrailingValid(token)) {
+                return -1;
+            }
+            msg.trailing = token;
             pos = std::string::npos;
             break;
         }
-        msg.parameters[i] = ConsumeToken(message, pos);
+        token = ConsumeToken(message, pos);
+        if (!IsMessageParameterValid(token)) {
+            return -1;
+        }
+        msg.parameters[i] = token;
         ++i;
     }
 
@@ -66,28 +149,71 @@ int ParseMessage(const std::string &message, Message &msg)
         if (message[pos] == ':') {
             pos += 1;
         }
-        msg.trailing = message.substr(pos);
+        token = message.substr(pos);
+        if (!IsMessageTrailingValid(token)) {
+            return -1;
+        }
+        msg.trailing = token;
     }
 
     return 0;
 }
 
-int ProcessMessage(EventLoopContext &context, Message &msg)
+int ProcessMessage(Message &msg)
 {
-    (void)context;
-    // parse prefix
-    // ...
+    char c;
 
-    // parse command
-    if (msg.command.length() == 3 && std::isdigit(msg.command[0]) && std::isdigit(msg.command[1]) &&
-        std::isdigit(msg.command[2])) {
-        // numeric =
-        //     (message[pos] - '0') * 100 + (message[pos + 1] - '0') * 10 + (message[pos + 2] -
-        //     '0');
-        // parse digit command
-    } else {
-        if (!IsCommand(msg.command)) {
-            return 1;
+    if (!msg.prefix.empty()) {
+        bool exclamation_seen = false;
+        bool at_seen = false;
+
+        for (size_t i = 0; i < msg.prefix.length(); i++) {
+            c = msg.prefix[i];
+
+            if (c == ' ' || c == '\r' || c == '\n' || c == '\0') {
+                return -1;
+            }
+
+            if (c == '!') {
+                if (exclamation_seen || at_seen || i == 0) {
+                    return -1;
+                }
+                exclamation_seen = true;
+            } else if (c == '@') {
+                if (at_seen || i == 0) {
+                    return -1;
+                }
+                at_seen = true;
+            }
+        }
+    }
+
+    if (msg.command.empty()) {
+        return -1;
+    }
+    for (size_t i = 0; i < msg.command.length(); i++) {
+        c = msg.command[i];
+        if (!std::isalpha(c)) {
+            return -1;
+        }
+    }
+
+    int n = 0;
+    while (n < kMaxParameters - 1) {
+        for (size_t i = 0; i < msg.parameters[n].length(); i++) {
+            c = msg.parameters[n][i];
+            if (c == '\0' || c == '\r' || c == '\n' || c == ' ' || c == ':') {
+                return -1;
+            }
+        }
+        ++n;
+    }
+
+    for (size_t i = 0; i < msg.trailing.length(); i++) {
+        c = msg.trailing[i];
+        // Spaces are allowed here
+        if (c == '\0' || c == '\r' || c == '\n' || c == ':') {
+            return -1;
         }
     }
     return 0;
@@ -95,7 +221,8 @@ int ProcessMessage(EventLoopContext &context, Message &msg)
 
 int ProcessTcpStream(EventLoopContext &context, char *buf, Client *client, ssize_t buflen)
 {
-    Message msg;
+    (void)context;
+    client->message = Message();
     ssize_t bytes_remaining = 0;
     ssize_t bytes_to_copy = buflen;
     size_t message_size;
@@ -114,10 +241,13 @@ int ProcessTcpStream(EventLoopContext &context, char *buf, Client *client, ssize
         }
         return -1;
     }
-    if (ParseMessage(client->msgbuf.substr(0, message_size), msg) == -1) {
+    // TODO: ParseMessage should be called multiple times if more than one
+    //       command are in the stream
+    if (ParseMessage(client->msgbuf.substr(0, message_size), client->message) == -1) {
+        // Potential IRC Error Code Handling (e.g. ERR_UNKNOWNCOMMAND)
+        // Set Epoll event to EPOLLOUT to send Error to client
         return -1;
     }
-    ProcessMessage(context, msg);
 
     return 0;
 }
