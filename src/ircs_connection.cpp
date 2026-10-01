@@ -209,13 +209,6 @@ Client *NewClient(int fd, char *ip)
     return c;
 }
 
-bool ValidateClient(int client_fd, msg::Message msg)
-{
-    // if (msg.command == "PASS") {
-    //     ValidatePassword(msg.parameters)
-    // }
-}
-
 bool ValidateNickname(const std::string &nick_name, int client_fd)
 {
     char first = nick_name[0];
@@ -256,8 +249,8 @@ bool ValidateUsername(const std::string &user_name)
         return false;  // add log and usermessage: bad username
     }
 
-    for (size_t i = 0; i < nick_name.lenght(); ++i) {
-        char c = nick_name[i];
+    for (size_t i = 0; i < user_name.lenght(); ++i) {
+        char c = user_name[i];
         if (std::iscntrl(c) || c == ' ' || c == '@' || c == ':') {
             return false;  // add log and usermessage: bad username
         }
@@ -273,6 +266,40 @@ bool ValidatePassword(const std::string password)
 
     if (EventLoopContext.password != password)
         return false;  // add log message and usermessage: bad password
+
+    return true;
+}
+
+bool ValidateClient(int client_fd, msg::Message &msg)
+{
+    if (msg.command == "PASS") {
+        if (ValidatePassword(msg.parameters[0])) {
+            clients[client_fd]->pass_accepted = true;
+        } else {
+            return false;
+        }
+    }
+
+    if (msg.command == "NICK") {
+        if (ValidateNickname(msg.parameters[0], client_fd)) {
+            clients[client_fd]->nick_accepted = true;
+            clients[client_fd]->nick_name = msg.parameters[0];
+        } else {
+            return false;
+        }
+    }
+
+    if (msg.command == "USER") {
+        if (ValidateUsername(msg.parameters[0])) {
+            clients[client_fd]->name_accepted = true;
+            clients[client_fd]->user_name = msg.parameters[0];
+        }
+    }
+
+    if (clients[client_fd]->state == CONNECTED && clients[client_fd]->pass_accepted &&
+        clients[client_fd]->nick_accepted && clients[client_fd]->name_accepted) {
+        clients[client_fd]->state = REGISTERED;
+    }
 
     return true;
 }

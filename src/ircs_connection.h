@@ -40,7 +40,7 @@ struct EventLoop {
     bool stop;
 };
 
-enum RegistrationState { CONNECTED, VALID, REGISTERED };
+enum RegistrationState { CONNECTED, REGISTERED };
 
 class Channel;
 
@@ -62,6 +62,8 @@ struct Client {
     std::vector<Channel *> joined_channels;
     // char msgbuf[kMsgBufSize];
     // ssize_t bytes_received;
+
+    RegistrationState state;
 };
 
 int CreateListener(char *port);
