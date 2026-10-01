@@ -47,8 +47,8 @@ class Channel;
 struct Client {
     int fd;
     std::string ip;
-    std::string msg_buf;
-    std::string write_buf;
+    std::string msgbuf;
+    std::string writebuf;
 
     bool pass_accepted;
     bool nick_accepted;
@@ -70,8 +70,8 @@ struct Client {
 
 bool ValidateNickname(const std::string &nick_name, int client_fd);
 bool ValidateUsername(const std::string &user_name);
-bool ValidatePassword(const std::string password);
-bool ValidateClient(int client_fd, msg::Message &msg);
+bool ValidatePassword(const std::string &user_pass, const char *server_pass);
+bool ValidateClient(int client_fd, msg::Message &msg, const char *server_pass);
 
 Client *NewClient(int fd, char *ip);
 

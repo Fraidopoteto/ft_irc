@@ -148,17 +148,6 @@ int CreateFileEvent(EventLoop *event_loop, int fd, int mask, FileProc proc, void
     return 0;
 }
 
-Client *NewClient(char *ip)
-{
-    // Initialize Client data
-    Client *c = new Client();
-    c->ip = ip;
-    c->msgbuf.reserve(msg::kMsgBufSize);
-    // c->bytes_received = 0;
-
-    return c;
-}
-
 void OnConnectionAccept(EventLoop *event_loop, int fd, void *data, int mask)
 {
     (void)mask;  // not sure what to do with mask yet
@@ -198,8 +187,8 @@ Client *NewClient(int fd, char *ip)
 
     c->fd = fd;
     c->ip = ip;
-    c->msg_buf.reserve(msg::kMsgBufSize);
-    c->write_buf.reserve(msg::kMsgBufSize);
+    c->msgbuf.reserve(msg::kMsgBufSize);
+    c->writebuf.reserve(msg::kMsgBufSize);
 
     c->state = CONNECTED;
 
@@ -260,21 +249,21 @@ bool ValidateUsername(const std::string &user_name)
     return true;
 }
 
-bool ValidatePassword(const std::string password)
+bool ValidatePassword(const std::string &user_pass, const char *server_pass)
 {
-    if (!ircs::EventLoopContext.password)
+    if (!server_pass)
         return true;
 
-    if (ircs::EventLoopContext.password != password)
+    if (server_pass != user_pass)
         return false;  // add log message and usermessage: bad password
 
     return true;
 }
 
-bool ValidateClient(int client_fd, msg::Message &msg)
+bool ValidateClient(int client_fd, msg::Message &msg, const char *server_pass)
 {
     if (msg.command == "PASS") {
-        if (ValidatePassword(msg.parameters[0])) {
+        if (ValidatePassword(msg.parameters[0], server_pass)) {
             clients[client_fd]->pass_accepted = true;
         } else {
             return false;

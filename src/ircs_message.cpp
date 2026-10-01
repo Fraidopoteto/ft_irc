@@ -68,6 +68,8 @@ int ParseMessage(const std::string &message, Message &msg)
         }
         msg.trailing = message.substr(pos);
     }
+
+    return 0;
 }
 
 int ProcessMessage(EventLoopContext &context, Message &msg)
