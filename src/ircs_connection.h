@@ -79,8 +79,7 @@ Client *NewClient(int fd, char *ip);
 int CreateListener(char *port);
 int CreateFileEvent(EventLoop *event_loop, int fd, int mask, FileProc proc, void *data);
 int RunEventLoop(EventLoop *event_loop);
-void OnConnectionAccept(EventLoop *event_loop, EventLoopContext &context, int fd, void *data,
-                        int mask);
+void OnConnectionAccept(EventLoop *event_loop, int fd, void *data, int mask);
 
 }  // namespace ircs
 

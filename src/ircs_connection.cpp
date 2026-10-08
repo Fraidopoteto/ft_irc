@@ -146,8 +146,7 @@ int CreateFileEvent(EventLoop *event_loop, int fd, int mask, FileProc proc, void
     return 0;
 }
 
-void OnConnectionAccept(EventLoop *event_loop, EventLoopContext &context, int fd, void *data,
-                        int mask)
+void OnConnectionAccept(EventLoop *event_loop, int fd, void *data, int mask)
 {
     (void)mask;  // not sure what to do with mask yet
     (void)data;  // Listener does not need data
@@ -170,7 +169,7 @@ void OnConnectionAccept(EventLoop *event_loop, EventLoopContext &context, int fd
 
     Client *c = NewClient(client_fd, ip);
 
-    context.clients[client_fd] = c;
+    event_loop->context.clients[client_fd] = c;
 
     if (CreateFileEvent(event_loop, client_fd, kOnReadable, OnClientReadStub, c) == -1) {
         Logger(log::kError, "OnConnectionAccept", "failed to add connection");
