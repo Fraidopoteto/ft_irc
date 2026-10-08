@@ -55,8 +55,7 @@ int main(int argc, char **argv)
         return 1;
     }
 
-    ircs::EventLoop el;
-    std::memset(&el, 0, sizeof(el));
+    ircs::EventLoop el = ircs::EventLoop();
     el.epfd = epfd;
     el.stop = false;
     el.context.port = static_cast<int>(port);
