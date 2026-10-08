@@ -4,9 +4,11 @@
 #include <sys/types.h>
 
 #include <cstring>
+#include <iostream>
 #include <string>
 
 #include "ircs_connection.h"
+#include "ircs_logger.h"
 
 namespace {
 
@@ -106,8 +108,69 @@ bool IsMessageTrailingValid(const std::string &trailing)
 namespace ircs {
 namespace msg {
 
-int ParseMessage(const std::string &message, ircs::msg::Message &msg)
+void MessageBufferAppend(MessageBuffer &buffer, char *buf, ssize_t buflen)
 {
+    buffer.data.append(buf, buflen);
+    if (buffer.data.find(kCrLf, 0) == std::string::npos && buffer.data.length() > kMaxMsgSize - 2) {
+        buffer.overflow = true;
+    }
+}
+
+ProcessStatus MessageBufferNext(MessageBuffer &buffer, std::string &out_line)
+{
+    size_t crlf_pos;
+    size_t message_length;
+
+    crlf_pos = buffer.data.find(kCrLf, buffer.read_pos);
+    if (crlf_pos == std::string::npos) {
+        message_length = buffer.data.length() - buffer.read_pos;
+        if (message_length > kMaxMsgSize - 2) {
+            buffer.overflow = true;
+            return kMessageTooLong;
+        }
+        return kNeedMoreData;
+    }
+
+    message_length = crlf_pos - buffer.read_pos;
+    if (message_length > kMaxMsgSize - 2) {
+        buffer.overflow = true;
+        return kMessageTooLong;
+    }
+
+    out_line = buffer.data.substr(buffer.read_pos, crlf_pos);
+    buffer.read_pos = crlf_pos + 2;
+
+    return kOk;
+}
+
+void MessageBufferCompact(MessageBuffer &buffer)
+{
+    if (buffer.read_pos == 0)
+        return;
+    buffer.data = buffer.data.substr(buffer.read_pos);
+    buffer.read_pos = 0;
+}
+
+size_t MessageBufferSize(MessageBuffer &buffer)
+{
+    return buffer.data.length();
+}
+
+bool MessageBufferOverflow(MessageBuffer &buffer)
+{
+    return buffer.overflow;
+}
+
+void MessageBufferClear(MessageBuffer &buffer)
+{
+    buffer.data.clear();
+    buffer.read_pos = 0;
+    buffer.overflow = false;
+}
+
+int ParseMessage(const std::string &message, Message &msg)
+{
+    msg = Message();
     std::string token;
     size_t pos = 0;
 
@@ -127,7 +190,8 @@ int ParseMessage(const std::string &message, ircs::msg::Message &msg)
     msg.command = token;
 
     int i = 0;
-    while (pos != std::string::npos && pos < message.length() && i < ircs::msg::kMaxParameters - 1) {
+    while (pos != std::string::npos && pos < message.length() &&
+           i < ircs::msg::kMaxParameters - 1) {
         if (message[pos] == ':') {
             token = message.substr(pos + 1);
             if (!IsMessageTrailingValid(token)) {
@@ -159,97 +223,39 @@ int ParseMessage(const std::string &message, ircs::msg::Message &msg)
     return 0;
 }
 
-int ProcessMessage(Message &msg)
+// STUB
+int DispatchMessage()
 {
-    char c;
-
-    if (!msg.prefix.empty()) {
-        bool exclamation_seen = false;
-        bool at_seen = false;
-
-        for (size_t i = 0; i < msg.prefix.length(); i++) {
-            c = msg.prefix[i];
-
-            if (c == ' ' || c == '\r' || c == '\n' || c == '\0') {
-                return -1;
-            }
-
-            if (c == '!') {
-                if (exclamation_seen || at_seen || i == 0) {
-                    return -1;
-                }
-                exclamation_seen = true;
-            } else if (c == '@') {
-                if (at_seen || i == 0) {
-                    return -1;
-                }
-                at_seen = true;
-            }
-        }
-    }
-
-    if (msg.command.empty()) {
-        return -1;
-    }
-    for (size_t i = 0; i < msg.command.length(); i++) {
-        c = msg.command[i];
-        if (!std::isalpha(c)) {
-            return -1;
-        }
-    }
-
-    int n = 0;
-    while (n < kMaxParameters - 1) {
-        for (size_t i = 0; i < msg.parameters[n].length(); i++) {
-            c = msg.parameters[n][i];
-            if (c == '\0' || c == '\r' || c == '\n' || c == ' ' || c == ':') {
-                return -1;
-            }
-        }
-        ++n;
-    }
-
-    for (size_t i = 0; i < msg.trailing.length(); i++) {
-        c = msg.trailing[i];
-        // Spaces are allowed here
-        if (c == '\0' || c == '\r' || c == '\n' || c == ':') {
-            return -1;
-        }
-    }
     return 0;
 }
 
-int ProcessTcpStream(EventLoopContext &context, char *buf, Client *client, ssize_t buflen)
+ProcessStatus ProcessTcpStream(EventLoopContext &context, char *buf, Client *client, ssize_t buflen)
 {
     (void)context;
-    client->message = Message();
-    ssize_t bytes_remaining = 0;
-    ssize_t bytes_to_copy = buflen;
-    size_t message_size;
+    std::string line;
 
-    if (client->msgbuf.length() + buflen > kMsgBufSize) {
-        bytes_remaining = (client->msgbuf.length() + buflen) - kMsgBufSize;
-        bytes_to_copy = buflen - bytes_remaining;
+    MessageBufferAppend(client->message_buffer, buf, buflen);
+    if (MessageBufferOverflow(client->message_buffer) == true) {
+        MessageBufferClear(client->message_buffer);
+        return kMessageTooLong;
     }
-    client->msgbuf.append(buf, bytes_to_copy);
 
-    if ((message_size = client->msgbuf.find(kCrLf)) == std::string::npos) {
-        if (client->msgbuf.length() > kMsgBufSize - 2) {
-            // Message invalid
-        } else {
-            // Message might not be fully received yet, wait for next read cycle
+    while (MessageBufferNext(client->message_buffer, line) == kOk) {
+        if (ParseMessage(line, client->message) == -1) {
+            return kProtocolError;
         }
-        return -1;
-    }
-    // TODO: ParseMessage should be called multiple times if more than one
-    //       command are in the stream
-    if (ParseMessage(client->msgbuf.substr(0, message_size), client->message) == -1) {
-        // Potential IRC Error Code Handling (e.g. ERR_UNKNOWNCOMMAND)
-        // Set Epoll event to EPOLLOUT to send Error to client
-        return -1;
+        DispatchMessage();
     }
 
-    return 0;
+    MessageBufferCompact(client->message_buffer);
+    if (MessageBufferOverflow(client->message_buffer) == true) {
+        MessageBufferClear(client->message_buffer);
+        return kMessageTooLong;
+    }
+    if (MessageBufferSize(client->message_buffer) > 0) {
+        return kNeedMoreData;
+    }
+    return kOk;
 }
 
 }  // namespace msg

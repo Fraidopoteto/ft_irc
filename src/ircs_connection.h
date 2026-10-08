@@ -48,7 +48,7 @@ class Channel;
 struct Client {
     int fd;
     std::string ip;
-    std::string msgbuf;
+    msg::MessageBuffer message_buffer;
     std::string writebuf;
 
     bool pass_accepted;

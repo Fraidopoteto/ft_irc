@@ -12,7 +12,7 @@ struct EventLoopContext;
 
 namespace msg {
 
-const int kMsgBufSize = 512;
+const int kMaxMsgSize = 512;
 const int kMaxParameters = 15;
 const char kCrLf[] = "\r\n";
 
@@ -94,14 +94,14 @@ enum kErrorCodes {
     kErrUsersDontMatch = 502
 };
 
-// enum Command { kPrivMsg,
-//     kUser,
-//     kNick,
-//     kPass,
-//     kJoin,
-//     kPart,
-//     kKick,
-// };
+enum ProcessStatus { kOk = 0, kNeedMoreData = 1, kMessageTooLong = 2, kProtocolError = 3 };
+
+struct MessageBuffer {
+    std::string data;
+    size_t read_pos;
+    // size_t max_size;
+    bool overflow;
+};
 
 struct Message {
     std::string prefix;
@@ -110,8 +110,10 @@ struct Message {
     std::string trailing;  // The last parameter
 };
 
+ProcessStatus MessageBufferNext(MessageBuffer &buffer, std::string &out_line);
 int ParseMessage(const std::string &message, Message &msg);
-int ProcessTcpStream(EventLoopContext &context, char *buf, Client *client, ssize_t buflen);
+ProcessStatus ProcessTcpStream(EventLoopContext &context, char *buf, Client *client,
+                               ssize_t buflen);
 
 }  // namespace msg
 }  // namespace ircs

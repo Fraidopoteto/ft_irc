@@ -99,7 +99,7 @@ TEST_CASE("ParseMessage correct error detection", "") {
                 REQUIRE(ret == -1);
             }
         }
-    }
+}
 
     SECTION("test trailing") {
         SECTION("valid") {
@@ -273,5 +273,112 @@ TEST_CASE("ParseMessage correct Message initialization", "[meta]")
         REQUIRE(msg.command == "CMD");
         REQUIRE(msg.parameters[0].empty());
         REQUIRE(msg.trailing.empty());
+    }
+}
+
+TEST_CASE("MessageBufferNext") {
+    ircs::msg::MessageBuffer buffer = ircs::msg::MessageBuffer();
+    std::string line;
+    ircs::msg::ProcessStatus status;
+
+    SECTION("one line") {
+        buffer.data = "NICK nickname\r\n";
+        status = ircs::msg::MessageBufferNext(buffer, line);
+        REQUIRE(status == ircs::msg::kOk);
+
+        CHECK(buffer.read_pos == 15);
+        CHECK(buffer.overflow == false);
+    }
+
+    SECTION("multiple lines") {
+        buffer.data = "PASS 6969\r\nNICK nickname\r\nUSER user\r\n";
+
+        // First line
+        status = ircs::msg::MessageBufferNext(buffer, line);
+        REQUIRE(status == ircs::msg::kOk);
+
+        CHECK(buffer.read_pos == 11);
+        CHECK(buffer.overflow == false);
+
+        // Second line
+        status = ircs::msg::MessageBufferNext(buffer, line);
+        REQUIRE(status == ircs::msg::kOk);
+
+        CHECK(buffer.read_pos == 26);
+        CHECK(buffer.overflow == false);
+
+        // Third line
+        status = ircs::msg::MessageBufferNext(buffer, line);
+        REQUIRE(status == ircs::msg::kOk);
+
+        CHECK(buffer.read_pos == 37);
+        CHECK(buffer.overflow == false);
+    }
+
+    SECTION("incomplete line") {
+        buffer.data = "NICK nickna";
+        status = ircs::msg::MessageBufferNext(buffer, line);
+        REQUIRE(status == ircs::msg::kNeedMoreData);
+
+        CHECK(buffer.read_pos == 0);
+        CHECK(buffer.overflow == false);
+    }
+
+    SECTION("one + incomplete line") {
+        buffer.data = "NICK nickname\r\nUSER us";
+
+        status = ircs::msg::MessageBufferNext(buffer, line);
+        REQUIRE(status == ircs::msg::kOk);
+
+        CHECK(buffer.read_pos == 15);
+        CHECK(buffer.overflow == false);
+
+        status = ircs::msg::MessageBufferNext(buffer, line);
+        REQUIRE(status == ircs::msg::kNeedMoreData);
+
+        CHECK(buffer.read_pos == 15);
+        CHECK(buffer.overflow == false);
+    }
+
+    SECTION("big message 512") {
+        buffer.data = std::string(510, 'A') + "\r\n";
+        status = ircs::msg::MessageBufferNext(buffer, line);
+        REQUIRE(status == ircs::msg::kOk);
+
+        CHECK(buffer.read_pos == 512);
+        CHECK(buffer.overflow == false);
+    }
+
+    SECTION("overflow with CRLF") {
+        buffer.data = std::string(511, 'A') + "\r\n";
+        status = ircs::msg::MessageBufferNext(buffer, line);
+        REQUIRE(status == ircs::msg::kMessageTooLong);
+
+        CHECK(buffer.read_pos == 0);
+        CHECK(buffer.overflow == true);
+    }
+
+    SECTION("overflow without CRLF") {
+        buffer.data = std::string(511, 'A');
+        status = ircs::msg::MessageBufferNext(buffer, line);
+        REQUIRE(status == ircs::msg::kMessageTooLong);
+
+        CHECK(buffer.read_pos == 0);
+        CHECK(buffer.overflow == true);
+    }
+
+    SECTION("one complete + overflow") {
+        buffer.data = "NICK nickname\r\n" + std::string(511, 'A') + "\r\n";
+        status = ircs::msg::MessageBufferNext(buffer, line);
+        REQUIRE(status == ircs::msg::kOk);
+
+        CHECK(buffer.read_pos == 15);
+        CHECK(buffer.overflow == false);
+
+        status = ircs::msg::MessageBufferNext(buffer, line);
+        REQUIRE(status == ircs::msg::kMessageTooLong);
+
+        CHECK(buffer.read_pos == 15);
+        CHECK(buffer.overflow == true);
     }
 }
