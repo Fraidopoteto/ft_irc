@@ -48,7 +48,7 @@ class Channel;
 struct Client {
     int fd;
     std::string ip;
-    std::string msgbuf;
+    msg::MessageBuffer message_buffer;
     std::string writebuf;
 
     bool pass_accepted;
@@ -60,6 +60,7 @@ struct Client {
     std::string real_name;
     std::string host_name;
 
+    msg::Message message;
     std::vector<Channel *> joined_channels;
     // char msgbuf[kMsgBufSize];
     // ssize_t bytes_received;

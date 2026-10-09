@@ -4,24 +4,15 @@
 #include <sys/types.h>
 
 #include <cstring>
+#include <iostream>
 #include <string>
 
 #include "ircs_connection.h"
+#include "ircs_logger.h"
 
-namespace ircs {
-namespace msg {
+namespace {
 
-const static std::string kCommandList[] = {kPass, kNick, kUser};
-
-int IsCommand(const std::string &cmd)
-{
-    for (int i = 0; i < 3; i++) {
-        if (cmd == kCommandList[i]) {
-            return 1;
-        }
-    }
-    return 0;
-}
+const static std::string kCommandList[] = {ircs::msg::kPass, ircs::msg::kNick, ircs::msg::kUser};
 
 std::string ConsumeToken(const std::string &message, size_t &pos)
 {
@@ -40,25 +31,181 @@ std::string ConsumeToken(const std::string &message, size_t &pos)
     return token;
 }
 
+bool IsMessagePrefixValid(const std::string &prefix)
+{
+    char c;
+
+    if (!prefix.empty()) {
+        bool exclamation_seen = false;
+        bool at_seen = false;
+
+        for (size_t i = 0; i < prefix.length(); i++) {
+            c = prefix[i];
+
+            if (c == ' ' || c == '\r' || c == '\n' || c == '\0') {
+                return false;
+            }
+
+            if (c == '!') {
+                if (exclamation_seen || at_seen || i == 0) {
+                    return false;
+                }
+                exclamation_seen = true;
+            } else if (c == '@') {
+                if (at_seen || i == 0) {
+                    return false;
+                }
+                at_seen = true;
+            }
+        }
+    }
+    return true;
+}
+
+bool IsMessageCommandValid(const std::string &command)
+{
+    char c;
+    if (command.empty()) {
+        return false;
+    }
+    for (size_t i = 0; i < command.length(); i++) {
+        c = command[i];
+        if (!std::isalpha(c)) {
+            return false;
+        }
+    }
+    return true;
+}
+
+bool IsMessageParameterValid(const std::string &parameter)
+{
+    char c;
+    for (size_t i = 0; i < parameter.length(); i++) {
+        c = parameter[i];
+        if (c == '\0' || c == '\r' || c == '\n' || c == ' ') {
+            return false;
+        }
+    }
+    return true;
+}
+
+bool IsMessageTrailingValid(const std::string &trailing)
+{
+    char c;
+
+    for (size_t i = 0; i < trailing.length(); i++) {
+        c = trailing[i];
+        // Spaces are allowed here
+        if (c == '\0' || c == '\r' || c == '\n') {
+            return false;
+        }
+    }
+    return true;
+}
+
+}  // namespace
+
+namespace ircs {
+namespace msg {
+
+void MessageBufferAppend(MessageBuffer &buffer, char *buf, ssize_t buflen)
+{
+    buffer.data.append(buf, buflen);
+    if (buffer.data.find(kCrLf, 0) == std::string::npos && buffer.data.length() > kMaxMsgSize - 2) {
+        buffer.overflow = true;
+    }
+}
+
+ProcessStatus MessageBufferNext(MessageBuffer &buffer, std::string &out_line)
+{
+    size_t crlf_pos;
+    size_t message_length;
+
+    crlf_pos = buffer.data.find(kCrLf, buffer.read_pos);
+    if (crlf_pos == std::string::npos) {
+        message_length = buffer.data.length() - buffer.read_pos;
+        if (message_length > kMaxMsgSize - 2) {
+            buffer.overflow = true;
+            return kMessageTooLong;
+        }
+        return kNeedMoreData;
+    }
+
+    message_length = crlf_pos - buffer.read_pos;
+    if (message_length > kMaxMsgSize - 2) {
+        buffer.overflow = true;
+        return kMessageTooLong;
+    }
+
+    out_line = buffer.data.substr(buffer.read_pos, crlf_pos);
+    buffer.read_pos = crlf_pos + 2;
+
+    return kOk;
+}
+
+void MessageBufferCompact(MessageBuffer &buffer)
+{
+    if (buffer.read_pos == 0)
+        return;
+    buffer.data = buffer.data.substr(buffer.read_pos);
+    buffer.read_pos = 0;
+}
+
+size_t MessageBufferSize(MessageBuffer &buffer)
+{
+    return buffer.data.length();
+}
+
+bool MessageBufferOverflow(MessageBuffer &buffer)
+{
+    return buffer.overflow;
+}
+
+void MessageBufferClear(MessageBuffer &buffer)
+{
+    buffer.data.clear();
+    buffer.read_pos = 0;
+    buffer.overflow = false;
+}
+
 int ParseMessage(const std::string &message, Message &msg)
 {
+    msg = Message();
+    std::string token;
     size_t pos = 0;
 
     if (message[pos] == ':') {
         pos += 1;
-        msg.prefix = ConsumeToken(message, pos);
+        token = ConsumeToken(message, pos);
+        if (!IsMessagePrefixValid(token)) {
+            return -1;
+        }
+        msg.prefix = token;
     }
 
-    msg.command = ConsumeToken(message, pos);
+    token = ConsumeToken(message, pos);
+    if (!IsMessageCommandValid(token)) {
+        return -1;
+    }
+    msg.command = token;
 
     int i = 0;
-    while (pos != std::string::npos && pos < message.length() && i < kMaxParameters - 1) {
+    while (pos != std::string::npos && pos < message.length() &&
+           i < ircs::msg::kMaxParameters - 1) {
         if (message[pos] == ':') {
-            msg.trailing = message.substr(pos + 1);
+            token = message.substr(pos + 1);
+            if (!IsMessageTrailingValid(token)) {
+                return -1;
+            }
+            msg.trailing = token;
             pos = std::string::npos;
             break;
         }
-        msg.parameters[i] = ConsumeToken(message, pos);
+        token = ConsumeToken(message, pos);
+        if (!IsMessageParameterValid(token)) {
+            return -1;
+        }
+        msg.parameters[i] = token;
         ++i;
     }
 
@@ -66,60 +213,49 @@ int ParseMessage(const std::string &message, Message &msg)
         if (message[pos] == ':') {
             pos += 1;
         }
-        msg.trailing = message.substr(pos);
+        token = message.substr(pos);
+        if (!IsMessageTrailingValid(token)) {
+            return -1;
+        }
+        msg.trailing = token;
     }
 
     return 0;
 }
 
-int ProcessMessage(EventLoopContext &context, Message &msg)
+// STUB
+int DispatchMessage()
+{
+    return 0;
+}
+
+ProcessStatus ProcessTcpStream(EventLoopContext &context, char *buf, Client *client, ssize_t buflen)
 {
     (void)context;
-    // parse prefix
-    // ...
+    std::string line;
 
-    // parse command
-    if (msg.command.length() == 3 && std::isdigit(msg.command[0]) && std::isdigit(msg.command[1]) &&
-        std::isdigit(msg.command[2])) {
-        // numeric =
-        //     (message[pos] - '0') * 100 + (message[pos + 1] - '0') * 10 + (message[pos + 2] -
-        //     '0');
-        // parse digit command
-    } else {
-        if (!IsCommand(msg.command)) {
-            return 1;
+    MessageBufferAppend(client->message_buffer, buf, buflen);
+    if (MessageBufferOverflow(client->message_buffer) == true) {
+        MessageBufferClear(client->message_buffer);
+        return kMessageTooLong;
+    }
+
+    while (MessageBufferNext(client->message_buffer, line) == kOk) {
+        if (ParseMessage(line, client->message) == -1) {
+            return kProtocolError;
         }
+        DispatchMessage();
     }
-    return 0;
-}
 
-int ProcessTcpStream(EventLoopContext &context, char *buf, Client *client, ssize_t buflen)
-{
-    Message msg;
-    ssize_t bytes_remaining = 0;
-    ssize_t bytes_to_copy = buflen;
-    size_t message_size;
-
-    if (client->msgbuf.length() + buflen > kMsgBufSize) {
-        bytes_remaining = (client->msgbuf.length() + buflen) - kMsgBufSize;
-        bytes_to_copy = buflen - bytes_remaining;
+    MessageBufferCompact(client->message_buffer);
+    if (MessageBufferOverflow(client->message_buffer) == true) {
+        MessageBufferClear(client->message_buffer);
+        return kMessageTooLong;
     }
-    client->msgbuf.append(buf, bytes_to_copy);
-
-    if ((message_size = client->msgbuf.find(kCrLf)) == std::string::npos) {
-        if (client->msgbuf.length() > kMsgBufSize - 2) {
-            // Message invalid
-        } else {
-            // Message might not be fully received yet, wait for next read cycle
-        }
-        return -1;
+    if (MessageBufferSize(client->message_buffer) > 0) {
+        return kNeedMoreData;
     }
-    if (ParseMessage(client->msgbuf.substr(0, message_size), msg) == -1) {
-        return -1;
-    }
-    ProcessMessage(context, msg);
-
-    return 0;
+    return kOk;
 }
 
 }  // namespace msg

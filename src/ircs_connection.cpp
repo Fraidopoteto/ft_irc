@@ -185,8 +185,8 @@ Client *NewClient(int fd, char *ip)
 
     c->fd = fd;
     c->ip = ip;
-    c->msgbuf.reserve(msg::kMsgBufSize);
-    c->writebuf.reserve(msg::kMsgBufSize);
+    c->message_buffer = msg::MessageBuffer();
+    c->writebuf.reserve(msg::kMaxMsgSize);
 
     c->state = CONNECTED;
 
