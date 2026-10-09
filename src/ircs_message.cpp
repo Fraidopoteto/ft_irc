@@ -82,7 +82,7 @@ bool IsMessageParameterValid(const std::string &parameter)
     char c;
     for (size_t i = 0; i < parameter.length(); i++) {
         c = parameter[i];
-        if (c == '\0' || c == '\r' || c == '\n' || c == ' ' || c == ':') {
+        if (c == '\0' || c == '\r' || c == '\n' || c == ' ') {
             return false;
         }
     }

@@ -94,10 +94,10 @@ TEST_CASE("ParseMessage correct error detection", "") {
                 ret = ircs::msg::ParseMessage(s, msg);
                 REQUIRE(ret == -1);
             }
-            SECTION(":") {
-                ret = ircs::msg::ParseMessage(":nickname!user@host CMD para:", msg);
-                REQUIRE(ret == -1);
-            }
+        }
+        SECTION(":") {
+            ret = ircs::msg::ParseMessage(":nickname!user@host CMD pa:ra", msg);
+            REQUIRE(ret == 0);
         }
 }
 
@@ -176,23 +176,23 @@ TEST_CASE("ParseMessage correct Message initialization", "[meta]")
     }
 
     SECTION("Command with one parameter") {
-        ret = ircs::msg::ParseMessage("NICK Guest67", msg);
+        ret = ircs::msg::ParseMessage("NICK Guest67:", msg);
         REQUIRE(ret == 0);
 
         REQUIRE(msg.prefix.empty());
         REQUIRE(msg.command == "NICK");
-        REQUIRE(msg.parameters[0] == "Guest67");
+        REQUIRE(msg.parameters[0] == "Guest67:");
         REQUIRE(msg.parameters[1].empty()); // Verifies no extra parameters were parsed
         REQUIRE(msg.trailing.empty());
     }
 
     SECTION("Prefix, command, and one parameter") {
-        ret = ircs::msg::ParseMessage(":prefix NICK Guest67", msg);
+        ret = ircs::msg::ParseMessage(":prefix NICK Guest:67", msg);
         REQUIRE(ret == 0);
 
         REQUIRE(msg.prefix == "prefix");
         REQUIRE(msg.command == "NICK");
-        REQUIRE(msg.parameters[0] == "Guest67");
+        REQUIRE(msg.parameters[0] == "Guest:67");
         REQUIRE(msg.parameters[1].empty());
         REQUIRE(msg.trailing.empty());
     }
