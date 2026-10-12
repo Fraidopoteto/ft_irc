@@ -39,6 +39,7 @@ SRC :=	ircserv.cpp \
 		ircs_epoll.cpp \
 		ircs_logger.cpp \
 		ircs_message.cpp
+		# ircs_command.cpp \
 
 OBJ	:= $(SRC:.cpp=.o)
 OBJ	:= $(addprefix $(OBJDIR)/, $(OBJ))
@@ -88,6 +89,7 @@ TEST_APP_OBJ := $(addprefix $(TEST_OBJDIR)/, $(TEST_APP_OBJ))
 TEST_SRC := test_main.cpp \
 			test_ircs_message.cpp \
 			test_ircs_client_init.cpp
+			# test_ircs_command.cpp
 
 # ===========================================
 TEST_OBJ := $(TEST_SRC:.cpp=.o)

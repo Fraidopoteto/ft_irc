@@ -191,14 +191,16 @@ int ParseMessage(const std::string &message, Message &msg)
 
     int i = 0;
     while (pos != std::string::npos && pos < message.length() &&
-           i < ircs::msg::kMaxParameters - 1) {
+           i < ircs::msg::kMaxParameters) {
         if (message[pos] == ':') {
             token = message.substr(pos + 1);
             if (!IsMessageTrailingValid(token)) {
                 return -1;
             }
-            msg.trailing = token;
+            msg.has_trailing = true;
+            msg.parameters[i] = token;
             pos = std::string::npos;
+            ++i;
             break;
         }
         token = ConsumeToken(message, pos);
@@ -208,17 +210,7 @@ int ParseMessage(const std::string &message, Message &msg)
         msg.parameters[i] = token;
         ++i;
     }
-
-    if (pos != std::string::npos && pos < message.length()) {
-        if (message[pos] == ':') {
-            pos += 1;
-        }
-        token = message.substr(pos);
-        if (!IsMessageTrailingValid(token)) {
-            return -1;
-        }
-        msg.trailing = token;
-    }
+    msg.param_count = i;
 
     return 0;
 }
