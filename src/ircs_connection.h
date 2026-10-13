@@ -41,7 +41,7 @@ struct EventLoop {
     bool stop;
 };
 
-enum RegistrationState { CONNECTED, REGISTERED };
+enum RegistrationState { CONNECTED, REGISTERED, VALID };
 
 class Channel;
 

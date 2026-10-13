@@ -50,7 +50,6 @@ enum NumericReplies {
     kErrNoNicknameGiven = 431,
     kErrErroneousNickname = 432,
     kErrNicknameInUse = 433,
-    kErrNickCollision = 436,
     kErrUnavailResource = 437,
 
     // Membership & Session Errors
@@ -96,8 +95,10 @@ enum NumericReplies {
 
 struct CommandEntry;
 
-typedef void (*CommandFn)(const CommandEntry *command, EventLoopContext *ctx, Client *client,
-                          const msg::Message &message);
+enum CommandStatus { kContinue, kDisconnect };
+
+typedef CommandStatus (*CommandFn)(const CommandEntry *command, EventLoopContext *ctx,
+                                   Client *client, const msg::Message &message);
 
 enum CommandFlags {
     kCmdPreRegistrationOnly = 0x1,
