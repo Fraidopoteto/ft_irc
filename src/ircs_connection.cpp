@@ -15,7 +15,6 @@
 #include <cstring>
 #include <string>
 
-#include "ircs_connection.h"
 #include "ircs_epoll.h"
 #include "ircs_logger.h"
 #include "ircs_message.h"
