@@ -30,7 +30,8 @@ int EpollAddEvent(EventLoop *event_loop, int fd, int mask)
 void EpollDelEvent(EventLoop *event_loop, int fd, int delmask)
 {
     struct epoll_event ee;
-    int mask = event_loop->events[fd].mask & (~delmask);
+    int mask = event_loop->events[fd].mask = (~delmask);
+    event_loop->events[fd].mask = mask;
 
     ee.events = 0;
     if (mask & kOnReadable) {
