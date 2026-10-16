@@ -20,8 +20,11 @@ const int kOnWritable = 0x00000002;
 
 typedef void (*FileProc)(struct EventLoop *event_loop, int fd, void *data, int mask);
 
+enum FileEventState { kClosed = 0, kClosing = 1, kConnected = 2 };
+
 struct FileEvent {
     int mask;
+    FileEventState state;
     FileProc OnRead;
     FileProc OnWrite;
     void *data;
@@ -50,6 +53,7 @@ struct Client {
     std::string ip;
     msg::MessageBuffer message_buffer;
     std::string writebuf;
+    size_t write_pos;
 
     bool pass_accepted;
     bool nick_accepted;
@@ -79,8 +83,13 @@ Client *NewClient(int fd, char *ip);
 
 int CreateListener(char *port);
 int CreateFileEvent(EventLoop *event_loop, int fd, int mask, FileProc proc, void *data);
+int RemoveFileEvent(EventLoop *event_loop, int fd, int mask, void *data);
+void SetFileEventState(FileEvent &file_event, FileEventState state);
 int RunEventLoop(EventLoop *event_loop);
+
 void OnConnectionAccept(EventLoop *event_loop, int fd, void *data, int mask);
+void OnClientWrite(EventLoop *event_loop, int fd, void *data, int mask);
+void OnClientRead(EventLoop *event_loop, int fd, void *data, int mask);
 
 }  // namespace ircs
 

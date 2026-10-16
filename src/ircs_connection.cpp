@@ -47,7 +47,53 @@ int GetInAddress(struct sockaddr *sa, char *in_addr, size_t maxlen)
     return 0;
 }
 
-void OnClientReadStub(EventLoop *event_loop, int fd, void *data, int mask)
+void CloseClient(EventLoop *event_loop, int fd, void *data)
+{
+    if (data == NULL) {
+        return;
+    }
+    if (event_loop->events[fd].state == kClosed) {
+        return;
+    }
+
+    Client *client = static_cast<Client *>(data);
+
+    log::Logger(log::kInfo, "", "closing connection on %s", client->ip.c_str());
+
+    EpollDelEvent(event_loop, fd, kOnReadable | kOnWritable);
+    close(fd);
+    event_loop->context.clients.erase(fd);
+    event_loop->events[fd] = FileEvent();
+    SetFileEventState(event_loop->events[fd], kClosed);  // For clarity, but redundant
+    *client = Client();
+    delete client;
+}
+
+void RequestClose(EventLoop *event_loop, int fd, int mask, Client *client)
+{
+    if (client->writebuf.empty()) {
+        CloseClient(event_loop, fd, client);
+        return;
+    }
+
+    SetFileEventState(event_loop->events[fd], kClosing);
+    if (RemoveFileEvent(event_loop, fd, kOnReadable, client) == -1) {
+        CloseClient(event_loop, fd, client);
+        return;
+    }
+
+    // Ensure Write Event is registered
+    if (!(mask & kOnWritable)) {
+        if (CreateFileEvent(event_loop, fd, kOnWritable, OnClientWrite, client) == -1) {
+            CloseClient(event_loop, fd, client);
+            return;
+        }
+    }
+}
+
+}  // namespace
+
+void OnClientRead(EventLoop *event_loop, int fd, void *data, int mask)
 {
     Client *client = static_cast<Client *>(data);
     ssize_t bytes_received;
@@ -59,20 +105,101 @@ void OnClientReadStub(EventLoop *event_loop, int fd, void *data, int mask)
     }
 
     if (bytes_received == 0) {
-        // close the connection;
+        CloseClient(event_loop, fd, client);
+        return;
     }
 
     if (bytes_received > 0) {
-        msg::ProcessTcpStream(event_loop->context, buf, client, bytes_received);
+        msg::ProcessStatus status =
+            msg::ProcessTcpStream(event_loop->context, buf, client, bytes_received);
+
+        if (status == msg::kCloseConnection) {
+            RequestClose(event_loop, fd, mask, client);
+        }
     }
-    (void)event_loop;
-    (void)fd;
-    (void)data;
-    (void)mask;
-    return;
 }
 
-}  // namespace
+void OnClientWrite(EventLoop *event_loop, int fd, void *data, int mask)
+{
+    (void)mask;
+    Client *client = static_cast<Client *>(data);
+    ssize_t bytes_sent;
+    size_t bytes_to_sent = client->writebuf.length() - client->write_pos;
+
+    if (bytes_to_sent == 0) {
+        if (RemoveFileEvent(event_loop, fd, kOnWritable, client) == -1) {
+            CloseClient(event_loop, fd, client);
+        }
+        return;
+    }
+
+    bytes_sent =
+        send(fd, client->writebuf.c_str() + client->write_pos, bytes_to_sent, MSG_NOSIGNAL);
+    if (bytes_sent == -1) {
+        return;
+    }
+
+    // Peer has closed the connection before we could send the data
+    if (bytes_sent == 0) {
+        CloseClient(event_loop, fd, client);
+        return;
+    }
+
+    client->write_pos += bytes_sent;
+    if (client->write_pos == client->writebuf.length()) {
+        client->writebuf.clear();
+        client->write_pos = 0;
+        if (RemoveFileEvent(event_loop, fd, kOnWritable, client) == -1) {
+            CloseClient(event_loop, fd, client);
+            return;
+        }
+        if (event_loop->events[fd].state == kClosing) {
+            CloseClient(event_loop, fd, client);
+            return;
+        }
+    }
+}
+
+void SetFileEventState(FileEvent &file_event, FileEventState state)
+{
+    file_event.state = state;
+}
+
+int CreateFileEvent(EventLoop *event_loop, int fd, int mask, FileProc proc, void *data)
+{
+    FileEvent *fe = &event_loop->events[fd];
+
+    if (EpollAddEvent(event_loop, fd, mask) == -1) {
+        return -1;
+    }
+
+    fe->mask |= mask;
+    if (mask & kOnReadable) {
+        fe->OnRead = proc;
+    }
+    if (mask & kOnWritable) {
+        fe->OnWrite = proc;
+    }
+    fe->data = data;
+    return 0;
+}
+
+int RemoveFileEvent(EventLoop *event_loop, int fd, int mask, void *data)
+{
+    FileEvent *fe = &event_loop->events[fd];
+
+    EpollDelEvent(event_loop, fd, mask);
+
+    fe->mask = fe->mask & (~mask);
+    if (!(mask & kOnReadable)) {
+        fe->OnRead = NULL;
+    }
+    if (!(mask & kOnWritable)) {
+        fe->OnWrite = NULL;
+    }
+    fe->data = data;
+    return 0;
+}
 
 int CreateListener(char *port)
 {
@@ -127,25 +254,6 @@ int CreateListener(char *port)
     return listenfd;
 }
 
-int CreateFileEvent(EventLoop *event_loop, int fd, int mask, FileProc proc, void *data)
-{
-    FileEvent *fe = &event_loop->events[fd];
-
-    if (EpollAddEvent(event_loop, fd, mask) == -1) {
-        return -1;
-    }
-
-    fe->mask |= mask;
-    if (mask & kOnReadable) {
-        fe->OnRead = proc;
-    }
-    if (mask & kOnWritable) {
-        fe->OnWrite = proc;
-    }
-    fe->data = data;
-    return 0;
-}
-
 void OnConnectionAccept(EventLoop *event_loop, int fd, void *data, int mask)
 {
     (void)mask;  // not sure what to do with mask yet
@@ -169,12 +277,13 @@ void OnConnectionAccept(EventLoop *event_loop, int fd, void *data, int mask)
 
     Client *c = NewClient(client_fd, ip);
 
-    if (CreateFileEvent(event_loop, client_fd, kOnReadable, OnClientReadStub, c) == -1) {
+    if (CreateFileEvent(event_loop, client_fd, kOnReadable, OnClientRead, c) == -1) {
         Logger(log::kError, "OnConnectionAccept", "failed to add connection");
         close(client_fd);
         delete c;
         return;
     }
+    SetFileEventState(event_loop->events[client_fd], kConnected);
     event_loop->context.clients[client_fd] = c;
 }
 
@@ -186,6 +295,7 @@ Client *NewClient(int fd, char *ip)
     c->ip = ip;
     c->message_buffer = msg::MessageBuffer();
     c->writebuf.reserve(msg::kMaxMsgSize);
+    c->write_pos = 0;
 
     c->state = CONNECTED;
 
@@ -313,7 +423,7 @@ int RunEventLoop(EventLoop *event_loop)
             FileEvent *fe = &event_loop->events[fd];
 
             if (ev & (EPOLLERR | EPOLLHUP | EPOLLRDHUP)) {
-                // TODO: handle close
+                CloseClient(event_loop, fd, fe->data);
                 continue;
             }
 
