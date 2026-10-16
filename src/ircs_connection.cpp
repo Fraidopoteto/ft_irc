@@ -169,14 +169,13 @@ void OnConnectionAccept(EventLoop *event_loop, int fd, void *data, int mask)
 
     Client *c = NewClient(client_fd, ip);
 
-    event_loop->context.clients[client_fd] = c;
-
     if (CreateFileEvent(event_loop, client_fd, kOnReadable, OnClientReadStub, c) == -1) {
         Logger(log::kError, "OnConnectionAccept", "failed to add connection");
         close(client_fd);
         delete c;
         return;
     }
+    event_loop->context.clients[client_fd] = c;
 }
 
 Client *NewClient(int fd, char *ip)
