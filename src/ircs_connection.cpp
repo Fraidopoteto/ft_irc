@@ -110,6 +110,13 @@ void OnClientRead(EventLoop *event_loop, int fd, void *data, int mask)
         msg::ProcessStatus status =
             msg::ProcessTcpStream(event_loop->context, buf, client, bytes_received);
 
+        if (!client->writebuf.empty() && !(mask & kOnWritable)) {
+            if (CreateFileEvent(event_loop, fd, kOnWritable, OnClientWrite, data) == -1) {
+                CloseClient(event_loop, fd, client);
+                return;
+            }
+        }
+
         if (status == msg::kCloseConnection) {
             RequestClose(event_loop, fd, mask, client);
         }
