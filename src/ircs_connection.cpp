@@ -77,10 +77,7 @@ void RequestClose(EventLoop *event_loop, int fd, int mask, Client *client)
     }
 
     SetFileEventState(event_loop->events[fd], kClosing);
-    if (RemoveFileEvent(event_loop, fd, kOnReadable, client) == -1) {
-        CloseClient(event_loop, fd, client);
-        return;
-    }
+    RemoveFileEvent(event_loop, fd, kOnReadable, client);
 
     // Ensure Write Event is registered
     if (!(mask & kOnWritable)) {
@@ -127,9 +124,7 @@ void OnClientWrite(EventLoop *event_loop, int fd, void *data, int mask)
     size_t bytes_to_sent = client->writebuf.length() - client->write_pos;
 
     if (bytes_to_sent == 0) {
-        if (RemoveFileEvent(event_loop, fd, kOnWritable, client) == -1) {
-            CloseClient(event_loop, fd, client);
-        }
+        RemoveFileEvent(event_loop, fd, kOnWritable, client);
         return;
     }
 
@@ -149,10 +144,7 @@ void OnClientWrite(EventLoop *event_loop, int fd, void *data, int mask)
     if (client->write_pos == client->writebuf.length()) {
         client->writebuf.clear();
         client->write_pos = 0;
-        if (RemoveFileEvent(event_loop, fd, kOnWritable, client) == -1) {
-            CloseClient(event_loop, fd, client);
-            return;
-        }
+        RemoveFileEvent(event_loop, fd, kOnWritable, client);
         if (event_loop->events[fd].state == kClosing) {
             CloseClient(event_loop, fd, client);
             return;
@@ -184,21 +176,20 @@ int CreateFileEvent(EventLoop *event_loop, int fd, int mask, FileProc proc, void
     return 0;
 }
 
-int RemoveFileEvent(EventLoop *event_loop, int fd, int mask, void *data)
+void RemoveFileEvent(EventLoop *event_loop, int fd, int delmask, void *data)
 {
     FileEvent *fe = &event_loop->events[fd];
 
-    EpollDelEvent(event_loop, fd, mask);
+    EpollDelEvent(event_loop, fd, delmask);
 
-    fe->mask = fe->mask & (~mask);
-    if (!(mask & kOnReadable)) {
+    fe->mask = fe->mask & (~delmask);
+    if (delmask & kOnReadable) {
         fe->OnRead = NULL;
     }
-    if (!(mask & kOnWritable)) {
+    if (delmask & kOnWritable) {
         fe->OnWrite = NULL;
     }
     fe->data = data;
-    return 0;
 }
 
 int CreateListener(char *port)

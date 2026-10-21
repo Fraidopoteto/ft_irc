@@ -83,7 +83,7 @@ Client *NewClient(int fd, char *ip);
 
 int CreateListener(char *port);
 int CreateFileEvent(EventLoop *event_loop, int fd, int mask, FileProc proc, void *data);
-int RemoveFileEvent(EventLoop *event_loop, int fd, int mask, void *data);
+void RemoveFileEvent(EventLoop *event_loop, int fd, int delmask, void *data);
 void SetFileEventState(FileEvent &file_event, FileEventState state);
 int RunEventLoop(EventLoop *event_loop);
 
