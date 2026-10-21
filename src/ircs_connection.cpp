@@ -421,7 +421,9 @@ int RunEventLoop(EventLoop *event_loop)
             FileEvent *fe = &event_loop->events[fd];
 
             if (ev & (EPOLLERR | EPOLLHUP | EPOLLRDHUP)) {
-                CloseClient(event_loop, fd, fe->data);
+                if (fd != event_loop->listenfd) {
+                    CloseClient(event_loop, fd, fe->data);
+                }
                 continue;
             }
 
