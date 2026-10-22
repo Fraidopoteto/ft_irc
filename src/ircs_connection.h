@@ -20,8 +20,11 @@ const int kOnWritable = 0x00000002;
 
 typedef void (*FileProc)(struct EventLoop *event_loop, int fd, void *data, int mask);
 
+enum FileEventState { kClosed = 0, kClosing = 1, kConnected = 2 };
+
 struct FileEvent {
     int mask;
+    FileEventState state;
     FileProc OnRead;
     FileProc OnWrite;
     void *data;
@@ -35,6 +38,7 @@ struct EventLoopContext {
 
 struct EventLoop {
     int epfd;
+    int listenfd;
     int maxfds;                             // amount of file descriptors currently registered
     FileEvent events[kMaxConnections + 1];  // +1 to say the server is full to the last connection
     EventLoopContext context;
@@ -50,6 +54,7 @@ struct Client {
     std::string ip;
     msg::MessageBuffer message_buffer;
     std::string writebuf;
+    size_t write_pos;
 
     bool pass_accepted;
     bool nick_accepted;
@@ -68,6 +73,11 @@ struct Client {
     RegistrationState state;
 };
 
+namespace internal {
+void CloseClient(EventLoop *event_loop, int fd, void *data);
+void RequestClose(EventLoop *event_loop, int fd, int mask, Client *client);
+}  // namespace internal
+
 // Client Registration
 
 bool is_ValidNickname(const std::string &nick_name, int client_fd, EventLoopContext &context);
@@ -79,8 +89,13 @@ Client *NewClient(int fd, char *ip);
 
 int CreateListener(char *port);
 int CreateFileEvent(EventLoop *event_loop, int fd, int mask, FileProc proc, void *data);
+void RemoveFileEvent(EventLoop *event_loop, int fd, int delmask, void *data);
+void SetFileEventState(FileEvent &file_event, FileEventState state);
 int RunEventLoop(EventLoop *event_loop);
+
 void OnConnectionAccept(EventLoop *event_loop, int fd, void *data, int mask);
+void OnClientWrite(EventLoop *event_loop, int fd, void *data, int mask);
+void OnClientRead(EventLoop *event_loop, int fd, void *data, int mask);
 
 }  // namespace ircs
 
