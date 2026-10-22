@@ -7,7 +7,6 @@
 
 #include <map>
 #include <string>
-#include <vector>
 
 #include "ircs_message.h"
 #include "ircserv.h"
@@ -20,7 +19,7 @@ const int kOnWritable = 0x00000002;
 
 typedef void (*FileProc)(struct EventLoop *event_loop, int fd, void *data, int mask);
 
-enum FileEventState { kClosed = 0, kClosing = 1, kConnected = 2 };
+enum FileEventState { kFileEventClosed = 0, kFileEventClosing = 1, kFileEventRegistered = 2 };
 
 struct FileEvent {
     int mask;
@@ -45,7 +44,7 @@ struct EventLoop {
     bool stop;
 };
 
-enum RegistrationState { CONNECTED, REGISTERED };
+enum ClientRegistrationState { kClientConnected, kClientRegistered };
 
 struct Client {
     int fd;
@@ -65,7 +64,7 @@ struct Client {
 
     msg::Message message;
 
-    RegistrationState state;
+    ClientRegistrationState state;
 };
 
 namespace internal {

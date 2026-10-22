@@ -55,7 +55,7 @@ void SetUpFileEventAndClient(ircs::EventLoop *loop, int fd)
     int status = ircs::CreateFileEvent(loop, fd, ircs::kOnReadable, ircs::OnClientRead, client);
     REQUIRE(status == 0);
 
-    ircs::SetFileEventState(loop->events[fd], ircs::kConnected);
+    ircs::SetFileEventState(loop->events[fd], ircs::kFileEventRegistered);
 }
 
 TEST_CASE("OnClientRead")
@@ -78,7 +78,7 @@ TEST_CASE("OnClientRead")
 
         shutdown(sockfd[1], SHUT_RDWR);
         ircs::OnClientRead(&loop, sockfd[0], fe[sockfd[0]].data, fe[sockfd[0]].mask);
-        CHECK(fe[sockfd[0]].state == ircs::kClosed);
+        CHECK(fe[sockfd[0]].state == ircs::kFileEventClosed);
         CHECK(fe[sockfd[0]].data == NULL);
 
         close(sockfd[0]);
@@ -136,7 +136,7 @@ TEST_CASE("OnClientWrite")
         status = ircs::CreateFileEvent(&loop, sockfd[0], ircs::kOnWritable, ircs::OnClientWrite,
                                        fe[sockfd[0]].data);
         REQUIRE(status == 0);
-        SetFileEventState(fe[sockfd[0]], ircs::kClosing);
+        ircs::SetFileEventState(fe[sockfd[0]], ircs::kFileEventClosing);
 
         ircs::OnClientWrite(&loop, sockfd[0], fe[sockfd[0]].data, fe[sockfd[0]].mask);
         CHECK(fe[sockfd[0]].mask == ircs::kNone);
@@ -189,7 +189,7 @@ TEST_CASE("OnClientWrite")
         ircs::Client *client = static_cast<ircs::Client *>(fe[sockfd[0]].data);
         client->writebuf.append(msg);
 
-        ircs::SetFileEventState(fe[sockfd[0]], ircs::kClosing);
+        ircs::SetFileEventState(fe[sockfd[0]], ircs::kFileEventClosing);
 
         ircs::OnClientWrite(&loop, sockfd[0], fe[sockfd[0]].data, fe[sockfd[0]].mask);
         std::vector<char> buf(msg_len + 1);
@@ -222,7 +222,7 @@ TEST_CASE("OnClientWrite")
         ircs::Client *client = static_cast<ircs::Client *>(fe[sockfd[0]].data);
         client->writebuf.append(msg);
 
-        ircs::SetFileEventState(fe[sockfd[0]], ircs::kClosing);
+        ircs::SetFileEventState(fe[sockfd[0]], ircs::kFileEventClosing);
 
         ircs::OnClientWrite(&loop, sockfd[0], fe[sockfd[0]].data, fe[sockfd[0]].mask);
         std::vector<char> buf(msg_len + 1);
@@ -284,7 +284,7 @@ TEST_CASE("RequestClose")
 
         ircs::internal::RequestClose(&loop, sockfd[0], fe[sockfd[0]].mask, client);
         CHECK(fe[sockfd[0]].data != NULL);
-        CHECK(fe[sockfd[0]].state == ircs::kClosing);
+        CHECK(fe[sockfd[0]].state == ircs::kFileEventClosing);
         CHECK(fe[sockfd[0]].mask == ircs::kOnWritable);
 
         close(sockfd[0]);
@@ -320,7 +320,7 @@ TEST_CASE("CloseClient")
 
         ircs::internal::CloseClient(&loop, sockfd[0], client);
         CHECK(fe[sockfd[0]].data == NULL);
-        CHECK(fe[sockfd[0]].state == ircs::kClosed);
+        CHECK(fe[sockfd[0]].state == ircs::kFileEventClosed);
         CHECK(fe[sockfd[0]].mask == ircs::kNone);
         ircs::internal::CloseClient(&loop, sockfd[0], client);
     }

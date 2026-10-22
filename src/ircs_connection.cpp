@@ -9,22 +9,20 @@
 #include <sys/types.h>
 #include <unistd.h>
 
-#include <cctype>
 #include <cerrno>
 #include <cstddef>
 #include <cstring>
 #include <string>
 
-#include "ircs_connection.h"
 #include "ircs_epoll.h"
 #include "ircs_logger.h"
 #include "ircs_message.h"
 #include "ircserv.h"
 
 namespace ircs {
-using log::Logger;
 using internal::CloseClient;
 using internal::RequestClose;
+using log::Logger;
 
 namespace {
 
@@ -61,7 +59,7 @@ void CloseClient(EventLoop *event_loop, int fd, void *data)
     if (data == NULL) {
         return;
     }
-    if (event_loop->events[fd].state == kClosed) {
+    if (event_loop->events[fd].state == kFileEventClosed) {
         return;
     }
 
@@ -73,7 +71,7 @@ void CloseClient(EventLoop *event_loop, int fd, void *data)
     close(fd);
     event_loop->context.clients.erase(fd);
     event_loop->events[fd] = FileEvent();
-    SetFileEventState(event_loop->events[fd], kClosed);  // For clarity, but redundant
+    SetFileEventState(event_loop->events[fd], kFileEventClosed);  // For clarity, but redundant
     delete client;
     client = NULL;
 }
@@ -85,7 +83,7 @@ void RequestClose(EventLoop *event_loop, int fd, int mask, Client *client)
         return;
     }
 
-    SetFileEventState(event_loop->events[fd], kClosing);
+    SetFileEventState(event_loop->events[fd], kFileEventClosing);
     RemoveFileEvent(event_loop, fd, kOnReadable, client);
 
     // Ensure Write Event is registered
@@ -141,7 +139,7 @@ void OnClientWrite(EventLoop *event_loop, int fd, void *data, int mask)
 
     if (bytes_to_sent == 0) {
         RemoveFileEvent(event_loop, fd, kOnWritable, client);
-        if (event_loop->events[fd].state == kClosing) {
+        if (event_loop->events[fd].state == kFileEventClosing) {
             CloseClient(event_loop, fd, client);
         }
         return;
@@ -158,7 +156,7 @@ void OnClientWrite(EventLoop *event_loop, int fd, void *data, int mask)
         client->writebuf.clear();
         client->write_pos = 0;
         RemoveFileEvent(event_loop, fd, kOnWritable, client);
-        if (event_loop->events[fd].state == kClosing) {
+        if (event_loop->events[fd].state == kFileEventClosing) {
             CloseClient(event_loop, fd, client);
             return;
         }
@@ -286,7 +284,7 @@ void OnConnectionAccept(EventLoop *event_loop, int fd, void *data, int mask)
         delete c;
         return;
     }
-    SetFileEventState(event_loop->events[client_fd], kConnected);
+    SetFileEventState(event_loop->events[client_fd], kFileEventRegistered);
     event_loop->context.clients[client_fd] = c;
 }
 
@@ -300,7 +298,7 @@ Client *NewClient(int fd, char *ip)
     c->writebuf.reserve(msg::kMaxMsgSize);
     c->write_pos = 0;
 
-    c->state = CONNECTED;
+    c->state = kClientConnected;
 
     c->pass_accepted = false;
     c->nick_accepted = false;
