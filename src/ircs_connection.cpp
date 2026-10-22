@@ -49,6 +49,9 @@ int GetInAddress(struct sockaddr *sa, char *in_addr, size_t maxlen)
 
 void CloseClient(EventLoop *event_loop, int fd, void *data)
 {
+    if (fd == -1) {
+        return;
+    }
     if (data == NULL) {
         return;
     }
@@ -58,15 +61,15 @@ void CloseClient(EventLoop *event_loop, int fd, void *data)
 
     Client *client = static_cast<Client *>(data);
 
-    log::Logger(log::kInfo, "", "closing connection on %s", client->ip.c_str());
+    Logger(log::kInfo, "", "closing connection on %s", client->ip.c_str());
 
     EpollDelEvent(event_loop, fd, kOnReadable | kOnWritable);
     close(fd);
     event_loop->context.clients.erase(fd);
     event_loop->events[fd] = FileEvent();
     SetFileEventState(event_loop->events[fd], kClosed);  // For clarity, but redundant
-    *client = Client();
     delete client;
+    client = NULL;
 }
 
 void RequestClose(EventLoop *event_loop, int fd, int mask, Client *client)
