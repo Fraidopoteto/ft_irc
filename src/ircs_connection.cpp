@@ -23,6 +23,8 @@
 
 namespace ircs {
 using log::Logger;
+using internal::CloseClient;
+using internal::RequestClose;
 
 namespace {
 
@@ -46,6 +48,10 @@ int GetInAddress(struct sockaddr *sa, char *in_addr, size_t maxlen)
 
     return 0;
 }
+
+}  // namespace
+
+namespace internal {
 
 void CloseClient(EventLoop *event_loop, int fd, void *data)
 {
@@ -91,7 +97,7 @@ void RequestClose(EventLoop *event_loop, int fd, int mask, Client *client)
     }
 }
 
-}  // namespace
+}  // namespace internal
 
 void OnClientRead(EventLoop *event_loop, int fd, void *data, int mask)
 {
@@ -222,7 +228,6 @@ int CreateListener(char *port)
         if (listenfd < 0) {
             continue;
         }
-
         // Lose the pesky "address already in use" error message
         setsockopt(listenfd, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(int));
 

@@ -73,6 +73,11 @@ struct Client {
     RegistrationState state;
 };
 
+namespace internal {
+void CloseClient(EventLoop *event_loop, int fd, void *data);
+void RequestClose(EventLoop *event_loop, int fd, int mask, Client *client);
+}  // namespace internal
+
 // Client Registration
 
 bool is_ValidNickname(const std::string &nick_name, int client_fd, EventLoopContext &context);
