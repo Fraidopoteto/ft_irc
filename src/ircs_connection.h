@@ -30,6 +30,9 @@ struct FileEvent {
 struct EventLoopContext {
     int port;
     char *password;
+    const std::string kVersion = "ft_irc_1.0";
+    std::string creation_date;
+    std::string host_name;
     std::map<int, Client *> clients;
 };
 
@@ -64,6 +67,8 @@ struct Client {
     std::vector<Channel *> joined_channels;
     // char msgbuf[kMsgBufSize];
     // ssize_t bytes_received;
+
+    int mode;
 
     RegistrationState state;
 };

@@ -29,16 +29,26 @@ void QueueNumericReply(Client *client, int numeric, const std::string &message)
     client->writebuf += oss.str();
 }
 
-void SendWelcome(Client *client)
+void SendWelcome(Client *client, EventLoopContext *context)
 {
     if (!client)
         return;
 
-    std::string full_client_id =
+    const std::string full_client_id =
         client->nick_name + "!" + client->user_name + "@" + client->host_name;
 
-    std::string welcome_text = ":Welcome to the Internet Relay Network " + full_client_id;
-    QueueNumericReply(client, kRplWelcome, welcome_text);
+    const std::string RplWelcome = ":Welcome to the Internet Relay Network " + full_client_id;
+    QueueNumericReply(client, kRplWelcome, RplWelcome);
+
+    const std::string RplYourHost =
+        ":Your host is " + context.host_name + ", running version " + context.kVersion;
+    QueueNumericReply(client, kRplYourHost, RplYourHost);
+
+    const std::string RplCreated = "This server was created " + context.creation_date;
+    QueueNumericReply(client, kRplCreated, RplCreated);
+
+    const std::string RplMyInfo = context.host_name + " " + context.kVersion + " io itkol";
+    QueueNumericReply(client, kRplMyInfo, RplMyInfo);
 }
 
 CommandStatus HandlePass(const CommandEntry *command, EventLoopContext *context, Client *client,
@@ -105,7 +115,7 @@ CommandStatus HandleNick(const CommandEntry *command, EventLoopContext *context,
     if (client->state == VALID && client->state != REGISTERED) {
         client->nick_name = nick_name;
         client->state = REGISTERED;
-        SendWelcome(client);
+        SendWelcome(client, context);
         return kContinue;
     } else if (client->state == CONNECTED) {
         client->state = VALID;
@@ -120,11 +130,11 @@ CommandStatus HandleUser(const CommandEntry *command, EventLoopContext *context,
                          const msg::Message &message)
 {
     if (client->state == REGISTERED) {
-        QueueNumericReply(client, kErrAlreadyRegistered, message);
+        QueueNumericReply(client, kErrAlreadyRegistered, ":You may not reregister");
         return kContinue;
     }
     if (message.param_count < command->min_params) {
-        QueueNumericReply(client, kErrNeedMoreParams, message);
+        QueueNumericReply(client, kErrNeedMoreParams, "PASS :Not enough parameters");
         return kContinue;
     }
 
@@ -140,7 +150,7 @@ CommandStatus HandleUser(const CommandEntry *command, EventLoopContext *context,
         client->host_name = "localhost";  // TO DO: change the hostname
         client->real_name = real_name;
         client->state = REGISTERED;
-        SendWelcome(client);
+        SendWelcome(client, context);
         return kContinue;
     } else if (client->state == CONNECTED) {
         client->state = VALID;
