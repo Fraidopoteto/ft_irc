@@ -6,24 +6,54 @@ namespace ircs {
 
 namespace {
 
-void QueueNumeicReply(Client *client, int numeric, const std::string &message)
+void QueueNumericReply(Client *client, int numeric, const std::string &message)
 {
-    // TO DO: QueueNumeicReply-funcion
+    if (!client)
+        return;
+
+    std::ostringstream oss;
+
+    oss << ":localhost ";
+
+    oss << std::setfill('0') << std::setw(3) << numeric;
+
+    oss << " ";
+    if (client->nick_name.empty())
+        oss << "*";
+    else
+        oss << client->nick_name;
+
+    oss << " " << message;
+    oss << "\r\n";
+
+    client->writebuf += oss.str();
+}
+
+void SendWelcome(Client *client)
+{
+    if (!client)
+        return;
+
+    std::string full_client_id =
+        client->nick_name + "!" + client->user_name + "@" + client->host_name;
+
+    std::string welcome_text = ":Welcome to the Internet Relay Network " + full_client_id;
+    QueueNumericReply(client, kRplWelcome, welcome_text);
 }
 
 CommandStatus HandlePass(const CommandEntry *command, EventLoopContext *context, Client *client,
                          const msg::Message &message)
 {
     if (client->state == REGISTERED) {
-        QueueNumeicReply(client, kErrAlreadyRegistered, message);
+        QueueNumericReply(client, kErrAlreadyRegistered, ":You may not reregister");
         return kContinue;
     }
     if (message.param_count < command->min_params) {
-        QueueNumeicReply(client, kErrNeedMoreParams, message);
+        QueueNumericReply(client, kErrNeedMoreParams, "PASS :Not enough parameters");
         return kContinue;
     }
     if (message.parameters[0] != context->password) {
-        QueueNumeicReply(client, kErrPasswdMismatch, message);
+        QueueNumericReply(client, kErrPasswdMismatch, ":Password incorrect");
         return kDisconnect;
     }
 
@@ -36,7 +66,7 @@ CommandStatus HandleNick(const CommandEntry *command, EventLoopContext *context,
                          const msg::Message &message)
 {
     if (message.param_count < command->min_params) {
-        QueueNumeicReply(client, kErrNoNicknameGiven, message);
+        QueueNumericReply(client, kErrNoNicknameGiven, ":No nickname given");
         return kContinue;
     }
 
@@ -45,19 +75,19 @@ CommandStatus HandleNick(const CommandEntry *command, EventLoopContext *context,
 
     if (first == '$' || first == ':' || first == '#' || first == '&' || first == '@' ||
         first == '+') {
-        QueueNumeicReply(client, kErrErroneousNickname, message);
+        QueueNumericReply(client, kErrErroneousNickname, " :Erroneous nickname");
         return kContinue;
     }
 
     if (nick_name.empty() || nick_name.length() > 30 || nick_name.length() < 2) {
-        QueueNumeicReply(client, kErrErroneousNickname, message);
+        QueueNumericReply(client, kErrErroneousNickname, " :Erroneous nickname");
         return kContinue;
     }
 
     for (size_t i = 0; i < nick_name.length(); ++i) {
         char c = nick_name[i];
         if (c == ' ' || c == ',' || c == '*' || c == '?' || c == '!' || c == '@') {
-            QueueNumeicReply(client, kErrErroneousNickname, message);
+            QueueNumericReply(client, kErrErroneousNickname, " :Erroneous nickname");
             return kContinue;
         }
     }
@@ -66,7 +96,7 @@ CommandStatus HandleNick(const CommandEntry *command, EventLoopContext *context,
          it != context->clients.end(); ++it) {
         if (it->second->fd != client->fd) {
             if (it->second->nick_name == nick_name) {
-                QueueNumeicReply(client, kErrNicknameInUse, message);
+                QueueNumericReply(client, kErrNicknameInUse, " :Nickname is already in use");
                 return kContinue;
             }
         }
@@ -75,7 +105,7 @@ CommandStatus HandleNick(const CommandEntry *command, EventLoopContext *context,
     if (client->state == VALID && client->state != REGISTERED) {
         client->nick_name = nick_name;
         client->state = REGISTERED;
-        // welcome message
+        SendWelcome(client);
         return kContinue;
     } else if (client->state == CONNECTED) {
         client->state = VALID;
@@ -90,11 +120,11 @@ CommandStatus HandleUser(const CommandEntry *command, EventLoopContext *context,
                          const msg::Message &message)
 {
     if (client->state == REGISTERED) {
-        QueueNumeicReply(client, kErrAlreadyRegistered, message);
+        QueueNumericReply(client, kErrAlreadyRegistered, message);
         return kContinue;
     }
     if (message.param_count < command->min_params) {
-        QueueNumeicReply(client, kErrNeedMoreParams, message);
+        QueueNumericReply(client, kErrNeedMoreParams, message);
         return kContinue;
     }
 
@@ -110,7 +140,7 @@ CommandStatus HandleUser(const CommandEntry *command, EventLoopContext *context,
         client->host_name = "localhost";  // TO DO: change the hostname
         client->real_name = real_name;
         client->state = REGISTERED;
-        // welcome message
+        SendWelcome(client);
         return kContinue;
     } else if (client->state == CONNECTED) {
         client->state = VALID;
@@ -126,8 +156,8 @@ CommandStatus HandleUser(const CommandEntry *command, EventLoopContext *context,
 const static int kCommandTableSize = 3;
 const static CommandEntry kCommandTable[] = {
     {"PASS", HandlePass, 1, 1},
-    // {"USER", NULL, 1, 1},
-    // {"NICK", NULL, 1, 1},
+    {"USER", NULL, 4, 4},
+    {"NICK", NULL, 1, 1},
 };
 
 void NormalizeCommandName(std::string &command)

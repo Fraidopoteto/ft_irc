@@ -1,6 +1,7 @@
 #ifndef IRCS_COMMAND_H_
 #define IRCS_COMMAND_H_
 
+#include <iomanip>
 #include <string>
 
 #include "ircs_connection.h"
