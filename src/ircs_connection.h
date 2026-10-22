@@ -47,8 +47,6 @@ struct EventLoop {
 
 enum RegistrationState { CONNECTED, REGISTERED };
 
-class Channel;
-
 struct Client {
     int fd;
     std::string ip;
@@ -66,9 +64,6 @@ struct Client {
     std::string host_name;
 
     msg::Message message;
-    std::vector<Channel *> joined_channels;
-    // char msgbuf[kMsgBufSize];
-    // ssize_t bytes_received;
 
     RegistrationState state;
 };
@@ -77,13 +72,6 @@ namespace internal {
 void CloseClient(EventLoop *event_loop, int fd, void *data);
 void RequestClose(EventLoop *event_loop, int fd, int mask, Client *client);
 }  // namespace internal
-
-// Client Registration
-
-bool is_ValidNickname(const std::string &nick_name, int client_fd, EventLoopContext &context);
-bool is_ValidUsername(const std::string &user_name);
-bool is_ValidPassword(const std::string &user_pass, const char *server_pass);
-bool is_ValidClient(int client_fd, msg::Message &msg, EventLoopContext &context);
 
 Client *NewClient(int fd, char *ip);
 
