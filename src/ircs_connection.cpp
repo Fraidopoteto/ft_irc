@@ -135,18 +135,15 @@ void OnClientWrite(EventLoop *event_loop, int fd, void *data, int mask)
 
     if (bytes_to_sent == 0) {
         RemoveFileEvent(event_loop, fd, kOnWritable, client);
+        if (event_loop->events[fd].state == kClosing) {
+            CloseClient(event_loop, fd, client);
+        }
         return;
     }
 
     bytes_sent =
         send(fd, client->writebuf.c_str() + client->write_pos, bytes_to_sent, MSG_NOSIGNAL);
     if (bytes_sent == -1) {
-        return;
-    }
-
-    // Peer has closed the connection before we could send the data
-    if (bytes_sent == 0) {
-        CloseClient(event_loop, fd, client);
         return;
     }
 
