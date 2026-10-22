@@ -67,7 +67,7 @@ CommandStatus HandleNick(const CommandEntry *command, EventLoopContext *context,
         if (it->second->fd != client->fd) {
             if (it->second->nick_name == nick_name) {
                 QueueNumeicReply(client, kErrNicknameInUse, message);
-                return kDisconnect;
+                return kContinue;
             }
         }
     }
@@ -98,30 +98,17 @@ CommandStatus HandleUser(const CommandEntry *command, EventLoopContext *context,
         return kContinue;
     }
 
-    const std::string user_name = message.parameters[0];
+    std::string user_name = message.parameters[0];
+    const std::string real_name = message.parameters[3];
 
-    if (user_name[0] == '~') {
-        QueueNumeicReply(client, kErrErroneousNickname, message);  // TO DO: wich error ?
-        return kContinue;
-    }
-
-    if (user_name.empty() || user_name.length() > 10) {
-        QueueNumeicReply(client, kErrErroneousNickname, message);  // TO DO: wich error ?
-        return kContinue;
-    }
-
-    for (size_t i = 0; i < user_name.length(); ++i) {
-        char c = user_name[i];
-        if (std::iscntrl(c) || c == ' ' || c == '@' || c == ':') {
-            QueueNumeicReply(client, kErrErroneousNickname, message);  // TO DO: wich error ?
-            return kContinue;
-        }
+    if (user_name.length() > 10) {
+        user_name = user_name.substr(0, 10);
     }
 
     if (client->state == VALID && client->state != REGISTERED) {
-        client->user_name = user_name;  // TO DO: set user name "Identity Server"
-        client->host_name = user_name;
-        client->real_name = user_name;
+        client->user_name = user_name;
+        client->host_name = "localhost";  // TO DO: change the hostname
+        client->real_name = real_name;
         client->state = REGISTERED;
         // welcome message
         return kContinue;
@@ -129,9 +116,9 @@ CommandStatus HandleUser(const CommandEntry *command, EventLoopContext *context,
         client->state = VALID;
     }
 
-    client->user_name = user_name;  // TO DO: set user name "Identity Server"
-    client->host_name = user_name;
-    client->real_name = user_name;
+    client->user_name = user_name;
+    client->host_name = "localhost";  // TO DO: change the hostname
+    client->real_name = real_name;
 
     return kContinue;
 }
