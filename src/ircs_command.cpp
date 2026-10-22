@@ -41,13 +41,13 @@ void SendWelcome(Client *client, EventLoopContext *context)
     QueueNumericReply(client, kRplWelcome, RplWelcome);
 
     const std::string RplYourHost =
-        ":Your host is " + context.host_name + ", running version " + context.kVersion;
+        ":Your host is " + context->host_name + ", running version " + context->kVersion;
     QueueNumericReply(client, kRplYourHost, RplYourHost);
 
-    const std::string RplCreated = "This server was created " + context.creation_date;
+    const std::string RplCreated = "This server was created " + context->creation_date;
     QueueNumericReply(client, kRplCreated, RplCreated);
 
-    const std::string RplMyInfo = context.host_name + " " + context.kVersion + " io itkol";
+    const std::string RplMyInfo = context->host_name + " " + context->kVersion + " io itkol";
     QueueNumericReply(client, kRplMyInfo, RplMyInfo);
 }
 

@@ -10,10 +10,19 @@
 #include <unistd.h>
 
 #include <cstring>
+#include <ctime>
 #include <iostream>
 
 #include "ircs_connection.h"
 #include "ircs_logger.h"
+
+std::string getCreationDate()
+{
+    time_t now = time(NULL);
+    char buf[64];
+    strftime(buf, sizeof(buf), "%d %b %Y at %H:%M:%S", localtime(&now));
+    return buf;
+}
 
 using ircs::log::Logger;
 
@@ -60,6 +69,7 @@ int main(int argc, char **argv)
     el.stop = false;
     el.context.port = static_cast<int>(port);
     el.context.password = (argv[2] == NULL || argv[2][0] == '\0') ? NULL : argv[2];
+    el.context.creation_date = getCreationDate();
 
     if (CreateFileEvent(&el, listenfd, ircs::kOnReadable, ircs::OnConnectionAccept, NULL) == -1) {
         return 1;
