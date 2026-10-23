@@ -12,7 +12,8 @@
 #include <cstring>
 #include <iostream>
 
-#include "ircs_connection.h"
+#include "ircs_event_loop.h"
+#include "ircs_listener.h"
 #include "ircs_logger.h"
 
 using ircs::log::Logger;
@@ -62,7 +63,7 @@ int main(int argc, char **argv)
     el.context.port = static_cast<int>(port);
     el.context.password = (argv[2] == NULL || argv[2][0] == '\0') ? NULL : argv[2];
 
-    if (CreateFileEvent(&el, listenfd, ircs::kOnReadable, ircs::OnConnectionAccept, NULL) == -1) {
+    if (CreateFileEvent(&el, listenfd, ircs::kOnReadable, ircs::OnListenerRead, NULL) == -1) {
         return 1;
     }
 

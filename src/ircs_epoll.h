@@ -2,7 +2,7 @@
 #define IRCS_EPOLL_H_
 
 #include <stdint.h>
-#include "ircs_connection.h"
+#include "ircs_event_loop.h"
 
 namespace ircs {
 
