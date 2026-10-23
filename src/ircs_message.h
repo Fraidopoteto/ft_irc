@@ -112,8 +112,9 @@ struct MessageBuffer {
 struct Message {
     std::string prefix;
     std::string command;
-    std::string parameters[kMaxParameters - 1];
-    std::string trailing;  // The last parameter
+    std::string parameters[kMaxParameters];
+    int param_count;
+    bool has_trailing;
 };
 
 ProcessStatus MessageBufferNext(MessageBuffer &buffer, std::string &out_line);

@@ -140,50 +140,55 @@ TEST_CASE("ParseMessage correct Message initialization", "[meta]")
         ret = ircs::msg::ParseMessage("", msg);
         REQUIRE(ret == -1);
 
-        REQUIRE(msg.prefix.empty());
-        REQUIRE(msg.command.empty());
-        REQUIRE(msg.parameters[0].empty());
-        REQUIRE(msg.trailing.empty());
+        CHECK(msg.prefix.empty());
+        CHECK(msg.command.empty());
+        CHECK(msg.parameters[0].empty());
+        CHECK(msg.has_trailing == false);
+        CHECK(msg.param_count == 0);
     }
     SECTION("trailing spaces") {
         ret = ircs::msg::ParseMessage(":prefix CMD ", msg);
         REQUIRE(ret == 0);
 
-        REQUIRE(msg.prefix == "prefix");
-        REQUIRE(msg.command == "CMD");
-        REQUIRE(msg.parameters[0].empty());
-        REQUIRE(msg.trailing.empty());
+        CHECK(msg.prefix == "prefix");
+        CHECK(msg.command == "CMD");
+        CHECK(msg.parameters[0].empty());
+        CHECK(msg.has_trailing == false);
+        CHECK(msg.param_count == 0);
     }
 
     SECTION("Prefix only") {
         ret = ircs::msg::ParseMessage(":prefix", msg);
         REQUIRE(ret == -1);
 
-        REQUIRE(msg.prefix == "prefix");
-        REQUIRE(msg.command.empty());
-        REQUIRE(msg.parameters[0].empty());
-        REQUIRE(msg.trailing.empty());
+        CHECK(msg.prefix == "prefix");
+        CHECK(msg.command.empty());
+        CHECK(msg.parameters[0].empty());
+        CHECK(msg.has_trailing == false);
+        CHECK(msg.param_count == 0);
     }
 
     SECTION("Command only") {
         ret = ircs::msg::ParseMessage("NICK", msg);
         REQUIRE(ret == 0);
 
-        REQUIRE(msg.prefix.empty());
-        REQUIRE(msg.command == "NICK");
-        REQUIRE(msg.parameters[0].empty());
-        REQUIRE(msg.trailing.empty());
+        CHECK(msg.prefix.empty());
+        CHECK(msg.command == "NICK");
+        CHECK(msg.parameters[0].empty());
+        CHECK(msg.has_trailing == false);
+        CHECK(msg.param_count == 0);
     }
 
     SECTION("Command with one parameter") {
         ret = ircs::msg::ParseMessage("NICK Guest67:", msg);
         REQUIRE(ret == 0);
 
-        REQUIRE(msg.prefix.empty());
-        REQUIRE(msg.command == "NICK");
-        REQUIRE(msg.parameters[0] == "Guest67:");
-        REQUIRE(msg.parameters[1].empty()); // Verifies no extra parameters were parsed
-        REQUIRE(msg.trailing.empty());
+        CHECK(msg.prefix.empty());
+        CHECK(msg.command == "NICK");
+        CHECK(msg.parameters[0] == "Guest67:");
+        CHECK(msg.parameters[1].empty()); // Verifies no extra parameters were parsed
+        CHECK(msg.has_trailing == false);
+        CHECK(msg.param_count == 1);
     }
 
     SECTION("Prefix, command, and one parameter") {
@@ -193,86 +198,95 @@ TEST_CASE("ParseMessage correct Message initialization", "[meta]")
         REQUIRE(msg.prefix == "prefix");
         REQUIRE(msg.command == "NICK");
         REQUIRE(msg.parameters[0] == "Guest:67");
-        REQUIRE(msg.parameters[1].empty());
-        REQUIRE(msg.trailing.empty());
+        CHECK(msg.has_trailing == false);
+        CHECK(msg.param_count == 1);
     }
 
     SECTION("Prefix, command, and multiple parameters") {
         ret = ircs::msg::ParseMessage(":prefix CMD para1 para2", msg);
         REQUIRE(ret == 0);
 
-        REQUIRE(msg.prefix == "prefix");
-        REQUIRE(msg.command == "CMD");
-        REQUIRE(msg.parameters[0] == "para1");
-        REQUIRE(msg.parameters[1] == "para2");
-        REQUIRE(msg.parameters[2].empty());
-        REQUIRE(msg.trailing.empty());
+        CHECK(msg.prefix == "prefix");
+        CHECK(msg.command == "CMD");
+        CHECK(msg.parameters[0] == "para1");
+        CHECK(msg.parameters[1] == "para2");
+        CHECK(msg.parameters[2].empty());
+        CHECK(msg.has_trailing == false);
+        CHECK(msg.param_count == 2);
     }
 
     SECTION("Prefix, command, parameters, and trailing text") {
         ret = ircs::msg::ParseMessage(":prefix CMD para1 para2 :trailing", msg);
         REQUIRE(ret == 0);
 
-        REQUIRE(msg.prefix == "prefix");
-        REQUIRE(msg.command == "CMD");
-        REQUIRE(msg.parameters[0] == "para1");
-        REQUIRE(msg.parameters[1] == "para2");
-        REQUIRE(msg.parameters[2].empty());
-        REQUIRE(msg.trailing == "trailing");
+        CHECK(msg.prefix == "prefix");
+        CHECK(msg.command == "CMD");
+        CHECK(msg.parameters[0] == "para1");
+        CHECK(msg.parameters[1] == "para2");
+        CHECK(msg.parameters[2] == "trailing");
+        CHECK(msg.has_trailing == true);
+        CHECK(msg.param_count == 3);
     }
 
     SECTION("Trailing text with carriage returns and spaces") {
         ret = ircs::msg::ParseMessage(":prefix CMD para1 para2 :trailing with   spaces", msg);
         REQUIRE(ret == 0);
 
-        REQUIRE(msg.prefix == "prefix");
-        REQUIRE(msg.command == "CMD");
-        REQUIRE(msg.parameters[0] == "para1");
-        REQUIRE(msg.parameters[1] == "para2");
-        REQUIRE(msg.parameters[2].empty());
-        REQUIRE(msg.trailing == "trailing with   spaces");
+        CHECK(msg.prefix == "prefix");
+        CHECK(msg.command == "CMD");
+        CHECK(msg.parameters[0] == "para1");
+        CHECK(msg.parameters[1] == "para2");
+        CHECK(msg.parameters[2] == "trailing with   spaces");
+        CHECK(msg.has_trailing == true);
+        CHECK(msg.param_count == 3);
     }
 
     SECTION("Prefix, command and trailing") {
         ret = ircs::msg::ParseMessage(":prefix CMD :trailing", msg);
         REQUIRE(ret == 0);
 
-        REQUIRE(msg.prefix == "prefix");
-        REQUIRE(msg.command == "CMD");
-        REQUIRE(msg.parameters[0].empty());
-        REQUIRE(msg.trailing == "trailing");
+        CHECK(msg.prefix == "prefix");
+        CHECK(msg.command == "CMD");
+        CHECK(msg.parameters[0] == "trailing");
+        CHECK(msg.has_trailing == true);
+        CHECK(msg.param_count == 1);
     }
 
     SECTION("prefix, command, all params and trailing with colon") {
         ret = ircs::msg::ParseMessage(":prefix CMD 1 2 3 4 5 6 7 8 9 10 11 12 13 14 :trailing", msg);
         REQUIRE(ret == 0);
 
-        REQUIRE(msg.prefix == "prefix");
-        REQUIRE(msg.command == "CMD");
-        REQUIRE(msg.parameters[0] == "1");
-        REQUIRE(msg.parameters[13] == "14");
-        REQUIRE(msg.trailing == "trailing");
+        CHECK(msg.prefix == "prefix");
+        CHECK(msg.command == "CMD");
+        CHECK(msg.parameters[0] == "1");
+        CHECK(msg.parameters[13] == "14");
+        CHECK(msg.parameters[14] == "trailing");
+        CHECK(msg.has_trailing == true);
+        CHECK(msg.param_count == 15);
     }
 
     SECTION("prefix, command, all params and trailing without colon") {
-        ret = ircs::msg::ParseMessage(":prefix CMD 1 2 3 4 5 6 7 8 9 10 11 12 13 14 trailing", msg);
+        ret = ircs::msg::ParseMessage(":prefix CMD 1 2 3 4 5 6 7 8 9 10 11 12 13 14 no-trailing", msg);
         REQUIRE(ret == 0);
 
-        REQUIRE(msg.prefix == "prefix");
-        REQUIRE(msg.command == "CMD");
-        REQUIRE(msg.parameters[0] == "1");
-        REQUIRE(msg.parameters[13] == "14");
-        REQUIRE(msg.trailing == "trailing");
+        CHECK(msg.prefix == "prefix");
+        CHECK(msg.command == "CMD");
+        CHECK(msg.parameters[0] == "1");
+        CHECK(msg.parameters[13] == "14");
+        CHECK(msg.parameters[14] == "no-trailing");
+        CHECK(msg.has_trailing == false);
+        CHECK(msg.param_count == 15);
     }
 
     SECTION("prefix, command, empty trailing") {
         ret = ircs::msg::ParseMessage(":prefix CMD :", msg);
         REQUIRE(ret == 0);
 
-        REQUIRE(msg.prefix == "prefix");
-        REQUIRE(msg.command == "CMD");
-        REQUIRE(msg.parameters[0].empty());
-        REQUIRE(msg.trailing.empty());
+        CHECK(msg.prefix == "prefix");
+        CHECK(msg.command == "CMD");
+        CHECK(msg.parameters[0].empty());
+        CHECK(msg.has_trailing == true);
+        CHECK(msg.param_count == 1);
     }
 }
 
