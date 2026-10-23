@@ -94,7 +94,13 @@ enum kErrorCodes {
     kErrUsersDontMatch = 502
 };
 
-enum ProcessStatus { kOk = 0, kNeedMoreData = 1, kMessageTooLong = 2, kProtocolError = 3 };
+enum ProcessStatus {
+    kOk = 0,
+    kNeedMoreData = 1,
+    kMessageTooLong = 2,
+    kProtocolError = 3,
+    kCloseConnection = 4
+};
 
 struct MessageBuffer {
     std::string data;

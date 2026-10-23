@@ -35,8 +35,10 @@ ifeq ($(ASAN), 1)
 endif
 
 SRC :=	ircserv.cpp \
-		ircs_connection.cpp \
+		ircs_client.cpp \
 		ircs_epoll.cpp \
+		ircs_event_loop.cpp \
+		ircs_listener.cpp \
 		ircs_logger.cpp \
 		ircs_message.cpp
 		# ircs_command.cpp \
@@ -87,6 +89,8 @@ TEST_APP_OBJ := $(addprefix $(TEST_OBJDIR)/, $(TEST_APP_OBJ))
 # ===========================================
 
 TEST_SRC := test_main.cpp \
+			test_ircs_client.cpp \
+			test_ircs_event_loop.cpp \
 			test_ircs_message.cpp \
 			test_ircs_client_init.cpp
 			# test_ircs_command.cpp
