@@ -1,5 +1,7 @@
 #include "ircs_client.h"
 
+#include <sys/socket.h>
+
 #include "ircs_event_loop.h"
 
 namespace ircs {

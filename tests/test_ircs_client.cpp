@@ -1,9 +1,9 @@
-#include "catch.hpp"
-
+#include <sys/socket.h>
 #include <unistd.h>
 
-#include "ircs_epoll.h"
+#include "catch.hpp"
 #include "ircs_client.h"
+#include "ircs_epoll.h"
 
 void SetUpFileEventAndClient(ircs::EventLoop *loop, int fd);
 
@@ -189,4 +189,3 @@ TEST_CASE("OnClientWrite")
 
     close(epfd);
 }
-

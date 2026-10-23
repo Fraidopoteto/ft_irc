@@ -1,10 +1,6 @@
 #ifndef IRCS_EVENT_LOOP_H_
 #define IRCS_EVENT_LOOP_H_
 
-#include <arpa/inet.h>
-#include <stdint.h>
-#include <sys/socket.h>
-
 #include <map>
 
 #include "ircs_message.h"

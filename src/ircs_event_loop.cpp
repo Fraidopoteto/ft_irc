@@ -1,16 +1,9 @@
 #include "ircs_event_loop.h"
 
-#include <arpa/inet.h>
-#include <fcntl.h>
-#include <netdb.h>
-#include <stdlib.h>
 #include <sys/epoll.h>
-#include <sys/socket.h>
-#include <sys/types.h>
 #include <unistd.h>
 
 #include <cerrno>
-#include <cstddef>
 #include <cstring>
 
 #include "ircs_client.h"
