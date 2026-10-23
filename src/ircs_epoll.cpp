@@ -1,7 +1,7 @@
 #include <stdint.h>
 #include <sys/epoll.h>
 
-#include "ircs_connection.h"
+#include "ircs_event_loop.h"
 
 namespace ircs {
 

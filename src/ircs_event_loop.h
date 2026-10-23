@@ -1,12 +1,11 @@
-#ifndef IRCS_CONNECTION_H_
-#define IRCS_CONNECTION_H_
+#ifndef IRCS_EVENT_LOOP_H_
+#define IRCS_EVENT_LOOP_H_
 
 #include <arpa/inet.h>
 #include <stdint.h>
 #include <sys/socket.h>
 
 #include <map>
-#include <string>
 
 #include "ircs_message.h"
 #include "ircserv.h"
@@ -44,46 +43,13 @@ struct EventLoop {
     bool stop;
 };
 
-enum ClientRegistrationState { kClientConnected, kClientRegistered };
-
-struct Client {
-    int fd;
-    std::string ip;
-    msg::MessageBuffer message_buffer;
-    std::string writebuf;
-    size_t write_pos;
-
-    bool pass_accepted;
-    bool nick_accepted;
-    bool name_accepted;
-
-    std::string nick_name;
-    std::string user_name;
-    std::string real_name;
-    std::string host_name;
-
-    msg::Message message;
-
-    ClientRegistrationState state;
-};
-
-namespace internal {
-void CloseClient(EventLoop *event_loop, int fd, void *data);
+void CloseConnection(EventLoop *event_loop, int fd, void *data);
 void RequestClose(EventLoop *event_loop, int fd, int mask, Client *client);
-}  // namespace internal
-
-Client *NewClient(int fd, char *ip);
-
-int CreateListener(char *port);
 int CreateFileEvent(EventLoop *event_loop, int fd, int mask, FileProc proc, void *data);
 void RemoveFileEvent(EventLoop *event_loop, int fd, int delmask, void *data);
 void SetFileEventState(FileEvent &file_event, FileEventState state);
 int RunEventLoop(EventLoop *event_loop);
 
-void OnConnectionAccept(EventLoop *event_loop, int fd, void *data, int mask);
-void OnClientWrite(EventLoop *event_loop, int fd, void *data, int mask);
-void OnClientRead(EventLoop *event_loop, int fd, void *data, int mask);
-
 }  // namespace ircs
 
-#endif  // IRCS_CONNECTION_H_
+#endif  // IRCS_EVENT_LOOP_H_

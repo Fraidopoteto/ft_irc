@@ -4,11 +4,10 @@
 #include <sys/types.h>
 
 #include <cstring>
-#include <iostream>
 #include <string>
 
-#include "ircs_connection.h"
-#include "ircs_logger.h"
+#include "ircs_client.h"
+#include "ircs_event_loop.h"
 
 namespace {
 
