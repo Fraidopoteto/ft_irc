@@ -206,7 +206,8 @@ msg::ProcessStatus DispatchCommand(EventLoopContext *context, Client *client, ms
     NormalizeCommandName(message.command);
     const CommandEntry *cmd = LookupCommand(message.command);
     if (cmd == NULL) {
-        // ERR_UNKNOWNCOMMAND;
+        QueueNumericReply(client, kErrUnknownCommand, message.command + " :Unknown command");
+        return msg::kOk;
     }
 
     CommandStatus status = cmd->handler(cmd, context, client, message);
