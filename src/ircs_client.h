@@ -1,4 +1,3 @@
-
 #ifndef IRCS_CLIENT_H_
 #define IRCS_CLIENT_H_
 

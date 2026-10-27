@@ -3,8 +3,10 @@
 #include <sys/socket.h>
 
 #include "ircs_event_loop.h"
+#include "ircs_logger.h"
 
 namespace ircs {
+using log::Logger;
 
 Client *NewClient(int fd, char *ip)
 {
@@ -42,8 +44,9 @@ void OnClientRead(EventLoop *event_loop, int fd, void *data, int mask)
     }
 
     if (bytes_received > 0) {
+        Logger(log::kDebug, "", "received: %s", buf);
         msg::ProcessStatus status =
-            msg::ProcessTcpStream(event_loop->context, buf, client, bytes_received);
+            msg::ProcessTcpStream(&event_loop->context, buf, client, bytes_received);
 
         if (!client->writebuf.empty() && !(mask & kOnWritable)) {
             if (CreateFileEvent(event_loop, fd, kOnWritable, OnClientWrite, data) == -1) {
@@ -52,7 +55,7 @@ void OnClientRead(EventLoop *event_loop, int fd, void *data, int mask)
             }
         }
 
-        if (status == msg::kCloseConnection) {
+        if (status == msg::kCloseConnection || status == msg::kProtocolError) {
             RequestClose(event_loop, fd, mask, client);
         }
     }
