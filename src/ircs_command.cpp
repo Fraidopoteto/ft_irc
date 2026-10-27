@@ -1,6 +1,8 @@
 #include "ircs_command.h"
 
+#include <iomanip>
 #include <sstream>
+#include <vector>
 
 #include "ircs_client.h"
 #include "ircs_event_loop.h"
@@ -166,12 +168,19 @@ CommandStatus HandleUser(const CommandEntry *command, EventLoopContext *context,
     return kContinue;
 }
 
-const static int kCommandTableSize = 3;
-const static CommandEntry kCommandTable[] = {
-    {"PASS", HandlePass, 1, 1},
-    {"USER", NULL, 4, 4},
-    {"NICK", NULL, 1, 1},
-};
+// NOTE: Add Commands in this table!
+std::vector<CommandEntry> InitializeCommandTable()
+{
+    std::vector<CommandEntry> table;
+
+    table.push_back((CommandEntry){kPass, HandlePass, 1, 1});
+    table.push_back((CommandEntry){kUser, HandleUser, 4, 4});
+    table.push_back((CommandEntry){kNick, HandleNick, 1, 1});
+
+    return table;
+}
+
+const static std::vector<CommandEntry> kCommandTable = InitializeCommandTable();
 
 void NormalizeCommandName(std::string &command)
 {
@@ -182,7 +191,7 @@ void NormalizeCommandName(std::string &command)
 
 const CommandEntry *LookupCommand(const std::string &command)
 {
-    for (size_t i = 0; i < kCommandTableSize; i++) {
+    for (size_t i = 0; i < kCommandTable.size(); i++) {
         if (command == kCommandTable[i].name) {
             return &kCommandTable[i];
         }
