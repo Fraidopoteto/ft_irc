@@ -1,6 +1,9 @@
 #include "ircs_command.h"
 
-#include "ircs_connection.h"
+#include <sstream>
+
+#include "ircs_client.h"
+#include "ircs_event_loop.h"
 
 namespace ircs {
 
@@ -54,7 +57,7 @@ void SendWelcome(Client *client, EventLoopContext *context)
 CommandStatus HandlePass(const CommandEntry *command, EventLoopContext *context, Client *client,
                          const msg::Message &message)
 {
-    if (client->state == REGISTERED) {
+    if (client->state == kClientRegistered) {
         QueueNumericReply(client, kErrAlreadyRegistered, ":You may not reregister");
         return kContinue;
     }
@@ -112,13 +115,13 @@ CommandStatus HandleNick(const CommandEntry *command, EventLoopContext *context,
         }
     }
 
-    if (client->state == VALID && client->state != REGISTERED) {
+    if (client->state == kClientValid && client->state != kClientRegistered) {
         client->nick_name = nick_name;
-        client->state = REGISTERED;
+        client->state = kClientRegistered;
         SendWelcome(client, context);
         return kContinue;
-    } else if (client->state == CONNECTED) {
-        client->state = VALID;
+    } else if (client->state == kClientConnected) {
+        client->state = kClientValid;
     }
 
     client->nick_name = nick_name;
@@ -129,7 +132,7 @@ CommandStatus HandleNick(const CommandEntry *command, EventLoopContext *context,
 CommandStatus HandleUser(const CommandEntry *command, EventLoopContext *context, Client *client,
                          const msg::Message &message)
 {
-    if (client->state == REGISTERED) {
+    if (client->state == kClientRegistered) {
         QueueNumericReply(client, kErrAlreadyRegistered, ":You may not reregister");
         return kContinue;
     }
@@ -145,15 +148,15 @@ CommandStatus HandleUser(const CommandEntry *command, EventLoopContext *context,
         user_name = user_name.substr(0, 10);
     }
 
-    if (client->state == VALID && client->state != REGISTERED) {
+    if (client->state == kClientValid && client->state != kClientRegistered) {
         client->user_name = user_name;
         client->host_name = "localhost";  // TO DO: change the hostname
         client->real_name = real_name;
-        client->state = REGISTERED;
+        client->state = kClientRegistered;
         SendWelcome(client, context);
         return kContinue;
-    } else if (client->state == CONNECTED) {
-        client->state = VALID;
+    } else if (client->state == kClientConnected) {
+        client->state = kClientValid;
     }
 
     client->user_name = user_name;
@@ -200,7 +203,7 @@ msg::ProcessStatus DispatchCommand(EventLoopContext *context, Client *client, ms
     CommandStatus status = cmd->handler(cmd, context, client, message);
 
     if (status == kDisconnect) {
-        return msg::knotok;  // TO DO: new msg for failure
+        return msg::kCloseConnection;  // TO DO: new msg for failure
     }
     return msg::kOk;
 }
