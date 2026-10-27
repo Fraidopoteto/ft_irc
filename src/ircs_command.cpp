@@ -115,13 +115,13 @@ CommandStatus HandleNick(const CommandEntry *command, EventLoopContext *context,
         }
     }
 
-    if (client->state == kClientValid && client->state != kClientRegistered) {
+    if (client->state == kClientHasUser && client->state != kClientRegistered) {
         client->nick_name = nick_name;
         client->state = kClientRegistered;
         SendWelcome(client, context);
         return kContinue;
     } else if (client->state == kClientConnected) {
-        client->state = kClientValid;
+        client->state = kClientHasNick;
     }
 
     client->nick_name = nick_name;
@@ -148,7 +148,7 @@ CommandStatus HandleUser(const CommandEntry *command, EventLoopContext *context,
         user_name = user_name.substr(0, 10);
     }
 
-    if (client->state == kClientValid && client->state != kClientRegistered) {
+    if (client->state == kClientHasNick && client->state != kClientRegistered) {
         client->user_name = user_name;
         client->host_name = "localhost";  // TO DO: change the hostname
         client->real_name = real_name;
@@ -156,7 +156,7 @@ CommandStatus HandleUser(const CommandEntry *command, EventLoopContext *context,
         SendWelcome(client, context);
         return kContinue;
     } else if (client->state == kClientConnected) {
-        client->state = kClientValid;
+        client->state = kClientHasUser;
     }
 
     client->user_name = user_name;
