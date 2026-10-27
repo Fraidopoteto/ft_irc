@@ -210,6 +210,7 @@ msg::ProcessStatus DispatchCommand(EventLoopContext *context, Client *client, ms
         return msg::kOk;
     }
 
+    Logger(log::kDebug, "", "executing command %s...", message.command.c_str());
     CommandStatus status = cmd->handler(cmd, context, client, message);
 
     if (status == kDisconnect) {

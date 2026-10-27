@@ -7,6 +7,7 @@
 #include <string>
 
 #include "ircs_client.h"
+#include "ircs_command.h"
 #include "ircs_event_loop.h"
 
 namespace {
@@ -189,8 +190,7 @@ int ParseMessage(const std::string &message, Message &msg)
     msg.command = token;
 
     int i = 0;
-    while (pos != std::string::npos && pos < message.length() &&
-           i < ircs::msg::kMaxParameters) {
+    while (pos != std::string::npos && pos < message.length() && i < ircs::msg::kMaxParameters) {
         if (message[pos] == ':') {
             token = message.substr(pos + 1);
             if (!IsMessageTrailingValid(token)) {
@@ -214,13 +214,7 @@ int ParseMessage(const std::string &message, Message &msg)
     return 0;
 }
 
-// STUB
-int DispatchMessage()
-{
-    return 0;
-}
-
-ProcessStatus ProcessTcpStream(EventLoopContext &context, char *buf, Client *client, ssize_t buflen)
+ProcessStatus ProcessTcpStream(EventLoopContext *context, char *buf, Client *client, ssize_t buflen)
 {
     (void)context;
     std::string line;
@@ -235,7 +229,9 @@ ProcessStatus ProcessTcpStream(EventLoopContext &context, char *buf, Client *cli
         if (ParseMessage(line, client->message) == -1) {
             return kProtocolError;
         }
-        DispatchMessage();
+        if (DispatchCommand(context, client, client->message) == kCloseConnection) {
+            return kCloseConnection;
+        }
     }
 
     MessageBufferCompact(client->message_buffer);
