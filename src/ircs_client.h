@@ -9,7 +9,7 @@
 
 namespace ircs {
 
-enum ClientRegistrationState { kClientConnected, kClientRegistered };
+enum ClientRegistrationState { kClientConnected, kClientValid, kClientRegistered };
 
 struct Client {
     int fd;
