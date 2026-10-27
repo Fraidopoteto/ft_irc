@@ -27,6 +27,9 @@ struct FileEvent {
 struct EventLoopContext {
     int port;
     char *password;
+    std::string version;
+    std::string creation_date;
+    std::string host_name;
     std::map<int, Client *> clients;
 };
 

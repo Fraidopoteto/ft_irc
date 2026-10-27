@@ -69,6 +69,9 @@ int main(int argc, char **argv)
     el.epfd = epfd;
     el.listenfd = listenfd;
     el.stop = false;
+
+    el.context.host_name = kServerName;
+    el.context.version = kServerVersion;
     el.context.port = static_cast<int>(port);
     el.context.password = (argv[2] == NULL || argv[2][0] == '\0') ? NULL : argv[2];
     el.context.creation_date = getCreationDate();

@@ -1,10 +1,9 @@
 #ifndef IRCS_COMMAND_H_
 #define IRCS_COMMAND_H_
 
-#include <iomanip>
 #include <string>
 
-#include "ircs_connection.h"
+#include "ircs_event_loop.h"
 
 namespace ircs {
 
