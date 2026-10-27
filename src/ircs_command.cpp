@@ -1,38 +1,16 @@
 #include "ircs_command.h"
 
-#include <iomanip>
-#include <sstream>
 #include <vector>
 
 #include "ircs_client.h"
+#include "ircs_client_io.h"
 #include "ircs_event_loop.h"
+#include "ircs_logger.h"
 
 namespace ircs {
+using log::Logger;
 
 namespace {
-
-void QueueNumericReply(Client *client, int numeric, const std::string &message)
-{
-    if (!client)
-        return;
-
-    std::ostringstream oss;
-
-    oss << ":localhost ";
-
-    oss << std::setfill('0') << std::setw(3) << numeric;
-
-    oss << " ";
-    if (client->nick_name.empty())
-        oss << "*";
-    else
-        oss << client->nick_name;
-
-    oss << " " << message;
-    oss << "\r\n";
-
-    client->writebuf += oss.str();
-}
 
 void SendWelcome(Client *client, EventLoopContext *context)
 {
