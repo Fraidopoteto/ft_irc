@@ -40,18 +40,18 @@ void SendWelcome(Client *client, EventLoopContext *context)
     const std::string full_client_id =
         client->nick_name + "!" + client->user_name + "@" + client->host_name;
 
-    const std::string RplWelcome = ":Welcome to the Internet Relay Network " + full_client_id;
-    QueueNumericReply(client, kRplWelcome, RplWelcome);
+    const std::string rpl_welcome = ":Welcome to the Internet Relay Network " + full_client_id;
+    QueueNumericReply(client, kRplWelcome, rpl_welcome);
 
-    const std::string RplYourHost =
-        ":Your host is " + context->host_name + ", running version " + context->kVersion;
-    QueueNumericReply(client, kRplYourHost, RplYourHost);
+    const std::string rpl_yourhost =
+        ":Your host is " + context->host_name + ", running version " + context->version;
+    QueueNumericReply(client, kRplYourHost, rpl_yourhost);
 
-    const std::string RplCreated = "This server was created " + context->creation_date;
-    QueueNumericReply(client, kRplCreated, RplCreated);
+    const std::string rpl_created = "This server was created " + context->creation_date;
+    QueueNumericReply(client, kRplCreated, rpl_created);
 
-    const std::string RplMyInfo = context->host_name + " " + context->kVersion + " io itkol";
-    QueueNumericReply(client, kRplMyInfo, RplMyInfo);
+    const std::string rpl_myinfo = context->host_name + " " + context->version + " io itkol";
+    QueueNumericReply(client, kRplMyInfo, rpl_myinfo);
 }
 
 CommandStatus HandlePass(const CommandEntry *command, EventLoopContext *context, Client *client,
