@@ -138,7 +138,7 @@ ProcessStatus MessageBufferNext(MessageBuffer &buffer, std::string &out_line)
         return kMessageTooLong;
     }
 
-    out_line = buffer.data.substr(buffer.read_pos, crlf_pos);
+    out_line = buffer.data.substr(buffer.read_pos, message_length);
     buffer.read_pos = crlf_pos + 2;
 
     return kOk;
