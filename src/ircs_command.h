@@ -112,6 +112,9 @@ struct CommandEntry {
     int max_params;
 };
 
+msg::ProcessStatus DispatchCommand(EventLoopContext *context, Client *client,
+                                   msg::Message &message);
+
 }  // namespace ircs
 
 #endif  // IRCS_COMMAND_H_

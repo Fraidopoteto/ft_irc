@@ -36,12 +36,13 @@ endif
 
 SRC :=	ircserv.cpp \
 		ircs_client.cpp \
+		ircs_client_io.cpp \
+		ircs_command.cpp \
 		ircs_epoll.cpp \
 		ircs_event_loop.cpp \
 		ircs_listener.cpp \
 		ircs_logger.cpp \
 		ircs_message.cpp
-		# ircs_command.cpp \
 
 OBJ	:= $(SRC:.cpp=.o)
 OBJ	:= $(addprefix $(OBJDIR)/, $(OBJ))

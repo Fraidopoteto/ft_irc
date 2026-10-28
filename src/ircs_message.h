@@ -119,7 +119,7 @@ struct Message {
 
 ProcessStatus MessageBufferNext(MessageBuffer &buffer, std::string &out_line);
 int ParseMessage(const std::string &message, Message &msg);
-ProcessStatus ProcessTcpStream(EventLoopContext &context, char *buf, Client *client,
+ProcessStatus ProcessTcpStream(EventLoopContext *context, char *buf, Client *client,
                                ssize_t buflen);
 
 }  // namespace msg
